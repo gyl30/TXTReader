@@ -36,6 +36,11 @@ class main_window : public QMainWindow
     void perform_auto_scroll();
     void auto_scroll_click();
 
+    void increase_auto_speed();
+    void decrease_auto_speed();
+    void increase_font_size();
+    void decrease_font_size();
+
    private:
     void setup_ui();
     void setup_connections();
@@ -43,15 +48,18 @@ class main_window : public QMainWindow
     void load_chapter_to_display(int load_index, bool append, bool fouce);
     void insert_chapter_to_display(int load_index);
     void reset_auto_scroll_speed();
+    void update_font_size(int new_size);
 
    private:
     QTimer *auto_scroll_timer_;
     QListWidget *chapter_list_;
     QPlainTextEdit *text_display_;
     bool auto_scroll_ = false;
-    int speed_ = 30;
+    int speed_ = 80;
     QAction *add_speed_;
     QAction *del_speed_;
+    QAction *add_font_action_;
+    QAction *del_font_action_;
     QSplitter *splitter_;
     QAction *scroll_action_;
     QScrollBar *scroll_bar_;

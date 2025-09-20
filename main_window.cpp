@@ -24,12 +24,11 @@ main_window::main_window(QWidget *parent) : QMainWindow(parent), novel_manager_(
 {
     setup_ui();
     setup_connections();
+    update_font_size(24);
 
     text_display_->setStyleSheet(
         "background-color: #FDF6E3;"
         "color: #586E75;"
-        "font-family: 'Microsoft YaHei', 'SimSun';"
-        "font-size: 14pt;"
         "border: none;"
         "padding: 10px;");
 }
@@ -48,11 +47,17 @@ void main_window::setup_ui()
     toggle_list_action_->setStatusTip("显示/隐藏章节列表");
     main_tool_bar_->addAction(toggle_list_action_);
 
+    add_font_action_ = new QAction("+", this);
+    del_font_action_ = new QAction("-", this);
+    main_tool_bar_->addAction(add_font_action_);
+    main_tool_bar_->addAction(del_font_action_);
+
     scroll_action_ = new QAction("自动阅读", this);
     main_tool_bar_->addAction(scroll_action_);
 
     add_speed_ = new QAction("++", this);
     del_speed_ = new QAction("--", this);
+
     splitter_ = new QSplitter(Qt::Horizontal, this);
     auto_scroll_timer_ = new QTimer(this);
 
@@ -76,28 +81,51 @@ void main_window::reset_auto_scroll_speed()
 {
     auto_scroll_timer_->stop();
     speed_ = std::max(speed_, 30);
-    qDebug() << "speed " << speed_ * 15;
-    auto_scroll_timer_->setInterval(speed_ * 15);
+    qDebug() << "speed " << speed_ * 100;
+    auto_scroll_timer_->setInterval(speed_ * 100);
     auto_scroll_timer_->start();
+}
+void main_window::increase_auto_speed()
+{
+    speed_++;
+    reset_auto_scroll_speed();
+}
+void main_window::decrease_auto_speed()
+{
+    speed_--;
+    reset_auto_scroll_speed();
+}
+
+void main_window::update_font_size(int new_size)
+{
+    new_size = std::max(new_size, 8);
+    new_size = std::min(new_size, 72);
+    QFont current_font = text_display_->font();
+    qDebug() << "current font size " << current_font.pointSize() << " new size " << new_size;
+    current_font.setPointSize(new_size);
+    text_display_->setFont(current_font);
+}
+
+void main_window::increase_font_size()
+{
+    QFont current_font = text_display_->font();
+    auto font_size = current_font.pointSize();
+    update_font_size(font_size + 2);
+}
+
+void main_window::decrease_font_size()
+{
+    QFont current_font = text_display_->font();
+    auto font_size = current_font.pointSize();
+    update_font_size(font_size + -2);
 }
 
 void main_window::setup_connections()
 {
-    connect(add_speed_,
-            &QAction::triggered,
-            [this]()
-            {
-                speed_++;
-                reset_auto_scroll_speed();
-            });
-    connect(del_speed_,
-            &QAction::triggered,
-            [this]()
-            {
-                speed_--;
-                reset_auto_scroll_speed();
-            });
-
+    connect(add_speed_, &QAction::triggered, [this]() { increase_auto_speed(); });
+    connect(del_speed_, &QAction::triggered, [this]() { decrease_auto_speed(); });
+    connect(add_font_action_, &QAction::triggered, [this]() { increase_font_size(); });
+    connect(del_font_action_, &QAction::triggered, [this]() { decrease_font_size(); });
     connect(auto_scroll_timer_, &QTimer::timeout, this, &main_window::perform_auto_scroll);
     connect(open_file_action_, &QAction::triggered, this, &main_window::open_file_dialog);
     connect(scroll_action_, &QAction::triggered, this, &main_window::auto_scroll_click);
@@ -131,7 +159,7 @@ void main_window::perform_auto_scroll()
     }
     else
     {
-        scroll_bar->setValue(scroll_bar->value() + 1);
+        scroll_bar->setValue(scroll_bar->value() + 2);
     }
 }
 
