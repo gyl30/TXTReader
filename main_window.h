@@ -22,6 +22,9 @@ class main_window : public QMainWindow
     explicit main_window(QWidget *parent = nullptr);
     ~main_window();
 
+   protected:
+    void paintEvent(QPaintEvent *event) override;
+
    private slots:
     void toggle_chapter_list_visibility();
     void open_file_dialog();
@@ -40,6 +43,7 @@ class main_window : public QMainWindow
     void decrease_auto_speed();
     void increase_font_size();
     void decrease_font_size();
+    void update_background_gradient();
 
    private:
     void setup_ui();
@@ -49,8 +53,13 @@ class main_window : public QMainWindow
     void insert_chapter_to_display(int load_index);
     void reset_auto_scroll_speed();
     void update_font_size(int new_size);
+    void on_color_action();
 
    private:
+    int gradient_offset_ = 0;
+    bool is_dynamic_background_ = false;
+    QTimer *background_animation_timer_;
+    int hue_;
     QTimer *auto_scroll_timer_;
     QListWidget *chapter_list_;
     QPlainTextEdit *text_display_;
@@ -64,6 +73,7 @@ class main_window : public QMainWindow
     QAction *scroll_action_;
     QScrollBar *scroll_bar_;
     QAction *open_file_action_;
+    QAction *color_action_;
     QToolBar *main_tool_bar_;
     QAction *toggle_list_action_;
     novel_manager *novel_manager_;

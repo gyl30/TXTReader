@@ -1,5 +1,6 @@
 #include <QToolBar>
 #include <QListWidget>
+#include <QPainter>
 #include <QLabel>
 #include <QLineEdit>
 #include <QHBoxLayout>
@@ -16,6 +17,7 @@
 #include <QDebug>
 #include <QFileInfo>
 #include <algorithm>
+#include "splitter.h"
 #include "main_window.h"
 #include "novel_manager.h"
 
@@ -25,12 +27,11 @@ main_window::main_window(QWidget *parent) : QMainWindow(parent), novel_manager_(
     setup_ui();
     setup_connections();
     update_font_size(24);
-
-    text_display_->setStyleSheet(
-        "background-color: #FDF6E3;"
-        "color: #586E75;"
-        "border: none;"
-        "padding: 10px;");
+    hue_ = 180;
+    background_animation_timer_ = new QTimer(this);
+    connect(background_animation_timer_, &QTimer::timeout, this, &main_window::update_background_gradient);
+    background_animation_timer_->start(50);
+    this->setStyleSheet("QSplitter, QPlainTextEdit, QListWidget, QToolBar, QStatusBar { background-color: transparent; border: none; }");
 }
 
 main_window::~main_window() { delete novel_manager_; }
@@ -42,6 +43,8 @@ void main_window::setup_ui()
 
     open_file_action_ = new QAction("打开", this);
     main_tool_bar_->addAction(open_file_action_);
+    color_action_ = new QAction("换色", this);
+    main_tool_bar_->addAction(color_action_);
 
     toggle_list_action_ = new QAction("目录", this);
     toggle_list_action_->setStatusTip("显示/隐藏章节列表");
@@ -58,17 +61,44 @@ void main_window::setup_ui()
     add_speed_ = new QAction("++", this);
     del_speed_ = new QAction("--", this);
 
-    splitter_ = new QSplitter(Qt::Horizontal, this);
+    splitter_ = new AnimatedSplitter(Qt::Horizontal);
     auto_scroll_timer_ = new QTimer(this);
 
     setCentralWidget(splitter_);
 
     chapter_list_ = new QListWidget(splitter_);
+    chapter_list_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    chapter_list_->setStyleSheet(R"(
+    QScrollBar:vertical {
+        background: transparent;
+        width: 10px;
+        margin: 0px;
+    }
+    QScrollBar::handle:vertical {
+        background: rgba(120,120,120,120);
+        border-radius: 7px;
+        min-height: 80px;
+    }
+
+    QScrollBar::handle:vertical:hover {
+        background: rgba(80,80,80,180);
+    }
+    QScrollBar::add-line:vertical,
+    QScrollBar::sub-line:vertical {
+        height: 0px;
+    }
+    QScrollBar::add-page:vertical
+    QScrollBar::sub-page:vertical
+        background: transparent;
+    }
+)");
+
     text_display_ = new QPlainTextEdit(splitter_);
     text_display_->setReadOnly(true);
-    scroll_bar_ = text_display_->verticalScrollBar();
     text_display_->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     text_display_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+
+    scroll_bar_ = text_display_->verticalScrollBar();
     splitter_->addWidget(chapter_list_);
     splitter_->addWidget(text_display_);
     splitter_->setSizes({250, 800});
@@ -122,6 +152,7 @@ void main_window::decrease_font_size()
 
 void main_window::setup_connections()
 {
+    connect(color_action_, &QAction::triggered, [this]() { on_color_action(); });
     connect(add_speed_, &QAction::triggered, [this]() { increase_auto_speed(); });
     connect(del_speed_, &QAction::triggered, [this]() { decrease_auto_speed(); });
     connect(add_font_action_, &QAction::triggered, [this]() { increase_font_size(); });
@@ -356,3 +387,57 @@ void main_window::insert_chapter_to_display(int load_index)
 }
 
 void main_window::update_state_on_scroll() { update_progress_status(); }
+
+void main_window::on_color_action()
+{
+    is_dynamic_background_ = !is_dynamic_background_;
+
+    if (is_dynamic_background_)
+    {
+        background_animation_timer_->start();
+    }
+    else
+    {
+        background_animation_timer_->stop();
+    }
+
+    update();
+}
+
+void main_window::update_background_gradient()
+{
+    hue_ = (hue_ + 1) % 360;
+    gradient_offset_ = (gradient_offset_ + 1) % width();
+
+    if (is_dynamic_background_)
+    {
+        update();
+    }
+}
+
+void main_window::paintEvent(QPaintEvent *event)
+{
+    Q_UNUSED(event);
+    QPainter painter(this);
+
+    if (is_dynamic_background_)
+    {
+        int saturation = 80;
+        int value = 255;
+
+        QColor color1 = QColor::fromHsv(hue_, saturation, value);
+        QColor color2 = QColor::fromHsv((hue_ + 60) % 360, saturation, value);
+
+        QLinearGradient gradient(0, 0, width(), 0);
+
+        float pos = static_cast<float>(gradient_offset_) / width();
+        gradient.setColorAt(fmod(pos + 0.0, 1.0), color1);
+        gradient.setColorAt(fmod(pos + 0.5, 1.0), color2);
+        gradient.setColorAt(fmod(pos + 1.0, 1.0), color1);
+        painter.fillRect(rect(), gradient);
+    }
+    else
+    {
+        painter.fillRect(rect(), QColor("#FDF6E3"));
+    }
+}

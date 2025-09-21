@@ -21,6 +21,7 @@ include_directories(${Boost_INCLUDE_DIRS})
 
 add_executable(txt_reader
     main.cpp
+    splitter.cpp
     main_window.h
     main_window.cpp
     novel_manager.h
