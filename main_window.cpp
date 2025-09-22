@@ -27,7 +27,7 @@ main_window::main_window(QWidget* parent) : QMainWindow(parent), novel_manager_(
     hue_ = 180;
     background_animation_timer_ = new QTimer(this);
     connect(background_animation_timer_, &QTimer::timeout, this, &main_window::update_background_gradient);
-    on_color_action();
+    // on_color_action();
     this->setStyleSheet(
         "QSplitter, QPlainTextEdit, QListWidget, QToolBar, QStatusBar, QTextBrowser { background-color: transparent; border: none; }");
 }
@@ -178,7 +178,7 @@ void main_window::load_chapters_around(int center_index)
     text_display_->clear();
     displayed_chapter_indices_.clear();
 
-    size_t start_index = std::max<size_t>(0, center_index - 1);
+    size_t start_index = std::max<int>(0, center_index - 1);
     size_t end_index = std::min<size_t>(novel_manager_->get_total_chapters() - 1, center_index + 1);
 
     QString full_content;
@@ -204,7 +204,7 @@ void main_window::append_next_chapter()
         return;
     }
 
-    int last_loaded_index = displayed_chapter_indices_.last();
+    size_t last_loaded_index = displayed_chapter_indices_.last();
     if (last_loaded_index >= novel_manager_->get_total_chapters() - 1)
     {
         return;
@@ -212,7 +212,7 @@ void main_window::append_next_chapter()
 
     is_loading_content_ = true;
 
-    int next_index = last_loaded_index + 1;
+    int next_index = static_cast<int>(last_loaded_index + 1);
     QString content = novel_manager_->get_chapter_content(next_index);
     QString html_content = QString("<a name='ch_%1'></a>").arg(next_index) + content.toHtmlEscaped().replace("\n", "<br>");
 

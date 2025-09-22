@@ -22,7 +22,7 @@ class novel_manager : public QObject
     ~novel_manager();
 
     void load_file(const QString& file_path);
-    QString get_chapter_content(int chapter_index);
+    QString get_chapter_content(size_t chapter_index);
     [[nodiscard]] size_t get_total_chapters() const { return chapters_.size(); }
 
    signals:

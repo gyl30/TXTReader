@@ -79,7 +79,7 @@ void novel_manager::parse_chapters_async()
     emit parsing_finished(chapters_.size());
 }
 
-QString novel_manager::get_chapter_content(int chapter_index)
+QString novel_manager::get_chapter_content(size_t chapter_index)
 {
     if (chapter_index < 0 || chapter_index >= chapters_.size() || file_path_.isEmpty())
     {
