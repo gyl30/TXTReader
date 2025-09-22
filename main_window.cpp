@@ -1,6 +1,3 @@
-#include "main_window.h"
-#include "novel_manager.h"
-#include "splitter.h"
 #include <QDebug>
 #include <QTextDocumentFragment>
 #include <QFileDialog>
@@ -15,6 +12,9 @@
 #include <QTimer>
 #include <QToolBar>
 #include <algorithm>
+#include "splitter.h"
+#include "main_window.h"
+#include "novel_manager.h"
 
 static const int kChaptersInView = 5;
 static const int kScrollLoadThreshold = 500;
@@ -27,7 +27,6 @@ main_window::main_window(QWidget* parent) : QMainWindow(parent), novel_manager_(
     hue_ = 180;
     background_animation_timer_ = new QTimer(this);
     connect(background_animation_timer_, &QTimer::timeout, this, &main_window::update_background_gradient);
-    // on_color_action();
     this->setStyleSheet(
         "QSplitter, QPlainTextEdit, QListWidget, QToolBar, QStatusBar, QTextBrowser { background-color: transparent; border: none; }");
 }
@@ -48,18 +47,31 @@ void main_window::setup_ui()
     toggle_list_action_ = new QAction("目录", this);
     toggle_list_action_->setStatusTip("显示/隐藏章节列表");
     main_tool_bar_->addAction(toggle_list_action_);
+    main_tool_bar_->addSeparator();
 
-    add_font_action_ = new QAction("+", this);
-    del_font_action_ = new QAction("-", this);
+    add_font_action_ = new QAction("字体 +", this);
+    del_font_action_ = new QAction("字体 -", this);
     main_tool_bar_->addAction(add_font_action_);
     main_tool_bar_->addAction(del_font_action_);
+    main_tool_bar_->addSeparator();
+
+    add_line_spacing_action_ = new QAction("行距 +", this);
+    del_line_spacing_action_ = new QAction("行距 -", this);
+    main_tool_bar_->addAction(add_line_spacing_action_);
+    main_tool_bar_->addAction(del_line_spacing_action_);
+    main_tool_bar_->addSeparator();
+
+    // 添加字间距调整按钮
+    add_letter_spacing_action_ = new QAction("字距 +", this);
+    del_letter_spacing_action_ = new QAction("字距 -", this);
+    main_tool_bar_->addAction(add_letter_spacing_action_);
+    main_tool_bar_->addAction(del_letter_spacing_action_);
+    main_tool_bar_->addSeparator();
 
     scroll_action_ = new QAction("自动阅读", this);
     main_tool_bar_->addAction(scroll_action_);
-
-    add_speed_ = new QAction("++", this);
-    del_speed_ = new QAction("--", this);
-
+    add_speed_ = new QAction("速度 +", this);
+    del_speed_ = new QAction("速度 -", this);
     splitter_ = new AnimatedSplitter(Qt::Horizontal);
     auto_scroll_timer_ = new QTimer(this);
 
@@ -107,6 +119,56 @@ void main_window::setup_connections()
     connect(chapter_list_, &QListWidget::itemClicked, this, &main_window::on_chapter_list_item_clicked);
     connect(novel_manager_, &novel_manager::chapter_found, this, &main_window::on_chapter_found, Qt::QueuedConnection);
     connect(novel_manager_, &novel_manager::parsing_finished, this, &main_window::on_parsing_finished, Qt::QueuedConnection);
+    connect(add_line_spacing_action_, &QAction::triggered, this, &main_window::increase_line_spacing);
+    connect(del_line_spacing_action_, &QAction::triggered, this, &main_window::decrease_line_spacing);
+    connect(add_letter_spacing_action_, &QAction::triggered, this, &main_window::increase_letter_spacing);
+    connect(del_letter_spacing_action_, &QAction::triggered, this, &main_window::decrease_letter_spacing);
+}
+void main_window::update_text_style()
+{
+    QFont font = text_display_->font();
+    font.setPointSize(font_size_);
+
+    font.setLetterSpacing(QFont::AbsoluteSpacing, letter_spacing_);
+
+    text_display_->setFont(font);
+
+    QTextCursor cursor(text_display_->document());
+    cursor.beginEditBlock();
+
+    QTextBlock block = text_display_->document()->begin();
+    while (block.isValid())
+    {
+        QTextBlockFormat blockFormat = block.blockFormat();
+        blockFormat.setLineHeight(line_spacing_, QTextBlockFormat::LineDistanceHeight);
+        cursor.setPosition(block.position());
+        cursor.setBlockFormat(blockFormat);
+        block = block.next();
+    }
+    cursor.endEditBlock();
+}
+void main_window::increase_line_spacing()
+{
+    line_spacing_ += 1.0;
+    update_text_style();
+}
+
+void main_window::decrease_line_spacing()
+{
+    line_spacing_ = std::max(0.0, line_spacing_ - 1.0);
+    update_text_style();
+}
+
+void main_window::increase_letter_spacing()
+{
+    letter_spacing_ += 1.0;
+    update_text_style();
+}
+
+void main_window::decrease_letter_spacing()
+{
+    letter_spacing_ = std::max(0.0, letter_spacing_ - 1.0);
+    update_text_style();
 }
 
 void main_window::open_file_dialog()
@@ -191,7 +253,7 @@ void main_window::load_chapters_around(int center_index)
     }
 
     text_display_->setHtml(full_content);
-
+    update_text_style();
     text_display_->scrollToAnchor(QString("ch_%1").arg(center_index));
 
     is_loading_content_ = false;
@@ -279,7 +341,6 @@ void main_window::rebuild_document_for_prepend()
 
     if (anchor_to_restore.isEmpty())
     {
-        // 作为备用方案，如果找不到精确的锚点，就恢复到旧窗口的第一个章节
         anchor_to_restore = QString("ch_%1").arg(first_loaded_index);
     }
 

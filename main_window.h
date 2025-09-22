@@ -45,11 +45,16 @@ class main_window : public QMainWindow
     void decrease_font_size();
     void update_background_gradient();
     void on_color_action();
+    void increase_line_spacing();
+    void decrease_line_spacing();
+    void increase_letter_spacing();
+    void decrease_letter_spacing();
 
    private:
     void setup_ui();
     void setup_connections();
 
+    void update_text_style();
     void load_chapters_around(int center_index);
     void append_next_chapter();
     void rebuild_document_for_prepend();
@@ -79,10 +84,15 @@ class main_window : public QMainWindow
     QAction* scroll_action_;
     QAction* add_speed_;
     QAction* del_speed_;
-
+    QAction* add_line_spacing_action_;
+    QAction* del_line_spacing_action_;
+    QAction* add_letter_spacing_action_;
+    QAction* del_letter_spacing_action_;
     bool auto_scroll_ = false;
     int speed_ = 30;
-
+    int font_size_ = 24;
+    qreal line_spacing_ = 5.0;
+    qreal letter_spacing_ = 1.5;
     novel_manager* novel_manager_;
     QList<int> displayed_chapter_indices_;
     bool is_loading_content_ = false;
