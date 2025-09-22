@@ -37,6 +37,7 @@ main_window::~main_window() { delete novel_manager_; }
 void main_window::setup_ui()
 {
     main_tool_bar_ = new QToolBar("主工具栏", this);
+    main_tool_bar_->setMovable(false);
     addToolBar(main_tool_bar_);
 
     open_file_action_ = new QAction("打开", this);
@@ -68,7 +69,7 @@ void main_window::setup_ui()
     chapter_list_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     chapter_list_->setStyleSheet(R"(
     QScrollBar:vertical { background: transparent; width: 10px; margin: 0px; }
-    QScrollBar::handle:vertical { background: rgba(120,120,120,120); border-radius: 7px; min-height: 80px; }
+    QScrollBar::handle:vertical { background: rgba(120,120,120,120); border-radius: 7px; min-height: 60px; }
     QScrollBar::handle:vertical:hover { background: rgba(80,80,80,180); }
     QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; }
     QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: transparent; }
@@ -77,11 +78,15 @@ void main_window::setup_ui()
     text_display_ = new QTextBrowser(splitter_);
     text_display_->setReadOnly(true);
     text_display_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    text_display_->verticalScrollBar()->setVisible(false);
+    text_display_->horizontalScrollBar()->setVisible(false);
+
     scroll_bar_ = text_display_->verticalScrollBar();
     splitter_->addWidget(chapter_list_);
     splitter_->addWidget(text_display_);
     splitter_->setSizes({250, 800});
 
+    statusBar()->setSizeGripEnabled(false);
     setWindowTitle("TXT 小说阅读器");
     resize(1024, 768);
 }
@@ -168,7 +173,7 @@ void main_window::load_chapters_around(int center_index)
     }
 
     is_loading_content_ = true;
-    statusBar()->showMessage("正在加载章节...", 2000);
+    statusBar()->showMessage("正在加载章节...", 1000);
 
     text_display_->clear();
     displayed_chapter_indices_.clear();
