@@ -1,0 +1,133 @@
+name: CI with MSYS2 for TXTReader
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows-mingw:
+    runs-on: windows-latest
+    env:
+      EXECUTABLE_NAME: TXTReader
+      BOOST_VERSION: '1.85.0'
+      BOOST_VERSION_UNDERSCORE: '1_85_0'
+
+    strategy:
+      matrix:
+        build_type: [debug, release]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja
+            mingw-w64-x86_64-qt6-base
+            mingw-w64-x86_64-qt6-tools
+            p7zip
+            wget
+
+      - name: Cache Boost
+        id: cache-boost
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/boost
+          key: ${{ runner.os }}-mingw-boost-regex-only-${{ env.BOOST_VERSION }}
+
+      - name: Build Boost from source
+        if: steps.cache-boost.outputs.cache-hit != 'true'
+        shell: msys2 {0}
+        env:
+          RUNNER_TEMP_WINDOWS: ${{ runner.temp }}
+        run: |
+          set -e
+          TEMP_DIR_NIX=$(cygpath -u "$RUNNER_TEMP_WINDOWS")
+          cd "$TEMP_DIR_NIX"
+          
+          BOOST_URL="https://archives.boost.io/release/${{ env.BOOST_VERSION }}/source/boost_${{ env.BOOST_VERSION_UNDERSCORE }}.tar.gz"
+          echo "Downloading Boost from $BOOST_URL"
+          wget -q "$BOOST_URL"
+          tar -xf boost_${{ env.BOOST_VERSION_UNDERSCORE }}.tar.gz
+          cd boost_${{ env.BOOST_VERSION_UNDERSCORE }}
+          
+          ./bootstrap.sh --with-toolset=gcc
+          
+          ./b2 install -j$(nproc) \
+            toolset=gcc \
+            --prefix="$TEMP_DIR_NIX/boost" \
+            --with-regex
+
+      - name: Set BOOST_ROOT environment variable
+        shell: msys2 {0}
+        run: |
+          BOOST_ROOT_NIX=$(cygpath -u "${{ runner.temp }}/boost")
+          echo "BOOST_ROOT=$BOOST_ROOT_NIX" >> $GITHUB_ENV
+
+      - name: Configure CMake
+        shell: msys2 {0}
+        run: |
+          cmake -S . -B build/${{ matrix.build_type }} \
+                -G Ninja \
+                -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+                -DBOOST_ROOT="$BOOST_ROOT"
+
+      - name: Build with CMake
+        shell: msys2 {0}
+        run: cmake --build build/${{ matrix.build_type }}
+
+      - name: Install Project
+        shell: msys2 {0}
+        run: cmake --install build/${{ matrix.build_type }} --prefix install
+
+      - name: Package All Dependencies
+        shell: msys2 {0}
+        run: |
+          set -e
+          INSTALL_DIR="install"
+          TARGET_DIR="$INSTALL_DIR/bin"
+          EXECUTABLE="TXTReader.exe"
+          
+          echo "--- Copying dependencies for $EXECUTABLE ---"
+          ldd "$TARGET_DIR/$EXECUTABLE" | grep -i 'mingw64/bin/' | awk '{print $3}' | sort -u | xargs -I % cp -v -n % "$TARGET_DIR"
+          echo "--- Copying Qt platform plugins ---"
+          mkdir -p "$TARGET_DIR/platforms"
+          cp -v /mingw64/share/qt6/plugins/platforms/qwindows.dll "$TARGET_DIR/platforms/"
+          
+          echo "--- Dependency packaging complete ---"
+          ls -R "$INSTALL_DIR"
+
+      - name: Create Archive
+        shell: msys2 {0}
+        run: |
+          ARCHIVE_NAME="${{ env.EXECUTABLE_NAME }}-mingw-x64-${{ matrix.build_type }}.zip"
+          cd install
+          7z a "../$ARCHIVE_NAME" ./*
+          cd ..
+          echo "ARCHIVE_PATH=$ARCHIVE_NAME" >> $GITHUB_ENV
+
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.EXECUTABLE_NAME }}-mingw-x64-${{ matrix.build_type }}
+          path: ${{ env.ARCHIVE_PATH }}
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
+        if: github.event_name == 'release' && matrix.build_type == 'release'
+        with:
+          files: ${{ env.ARCHIVE_PATH }}

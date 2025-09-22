@@ -1,28 +1,25 @@
-#include <QToolBar>
-#include <QListWidget>
-#include <QPainter>
-#include <QLabel>
-#include <QLineEdit>
-#include <QHBoxLayout>
-#include <QVBoxLayout>
-#include <QTimer>
-#include <QPlainTextEdit>
-#include <QSplitter>
-#include <QFileDialog>
-#include <QMenuBar>
-#include <QStatusBar>
-#include <QScrollBar>
-#include <QTextCursor>
-#include <QTextBlock>
-#include <QDebug>
-#include <QFileInfo>
-#include <algorithm>
-#include "splitter.h"
 #include "main_window.h"
 #include "novel_manager.h"
+#include "splitter.h"
+#include <QDebug>
+#include <QTextDocumentFragment>
+#include <QFileDialog>
+#include <QFileInfo>
+#include <QMenuBar>
+#include <QPainter>
+#include <QScrollBar>
+#include <QListWidget>
+#include <QStatusBar>
+#include <QTextBlock>
+#include <QTextCursor>
+#include <QTimer>
+#include <QToolBar>
+#include <algorithm>
 
-static const int kViewportSafeMargin = 5;
-main_window::main_window(QWidget *parent) : QMainWindow(parent), novel_manager_(new novel_manager()), is_updating_content_(false)
+static const int kChaptersInView = 5;
+static const int kScrollLoadThreshold = 500;
+
+main_window::main_window(QWidget* parent) : QMainWindow(parent), novel_manager_(new novel_manager())
 {
     setup_ui();
     setup_connections();
@@ -30,8 +27,9 @@ main_window::main_window(QWidget *parent) : QMainWindow(parent), novel_manager_(
     hue_ = 180;
     background_animation_timer_ = new QTimer(this);
     connect(background_animation_timer_, &QTimer::timeout, this, &main_window::update_background_gradient);
-    background_animation_timer_->start(50);
-    this->setStyleSheet("QSplitter, QPlainTextEdit, QListWidget, QToolBar, QStatusBar { background-color: transparent; border: none; }");
+    on_color_action();
+    this->setStyleSheet(
+        "QSplitter, QPlainTextEdit, QListWidget, QToolBar, QStatusBar, QTextBrowser { background-color: transparent; border: none; }");
 }
 
 main_window::~main_window() { delete novel_manager_; }
@@ -69,35 +67,16 @@ void main_window::setup_ui()
     chapter_list_ = new QListWidget(splitter_);
     chapter_list_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     chapter_list_->setStyleSheet(R"(
-    QScrollBar:vertical {
-        background: transparent;
-        width: 10px;
-        margin: 0px;
-    }
-    QScrollBar::handle:vertical {
-        background: rgba(120,120,120,120);
-        border-radius: 7px;
-        min-height: 80px;
-    }
+    QScrollBar:vertical { background: transparent; width: 10px; margin: 0px; }
+    QScrollBar::handle:vertical { background: rgba(120,120,120,120); border-radius: 7px; min-height: 80px; }
+    QScrollBar::handle:vertical:hover { background: rgba(80,80,80,180); }
+    QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; }
+    QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: transparent; }
+    )");
 
-    QScrollBar::handle:vertical:hover {
-        background: rgba(80,80,80,180);
-    }
-    QScrollBar::add-line:vertical,
-    QScrollBar::sub-line:vertical {
-        height: 0px;
-    }
-    QScrollBar::add-page:vertical
-    QScrollBar::sub-page:vertical
-        background: transparent;
-    }
-)");
-
-    text_display_ = new QPlainTextEdit(splitter_);
+    text_display_ = new QTextBrowser(splitter_);
     text_display_->setReadOnly(true);
-    text_display_->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     text_display_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-
     scroll_bar_ = text_display_->verticalScrollBar();
     splitter_->addWidget(chapter_list_);
     splitter_->addWidget(text_display_);
@@ -107,122 +86,22 @@ void main_window::setup_ui()
     resize(1024, 768);
 }
 
-void main_window::reset_auto_scroll_speed()
-{
-    auto_scroll_timer_->stop();
-    speed_ = std::max(speed_, 30);
-    qDebug() << "speed " << speed_ * 100;
-    auto_scroll_timer_->setInterval(speed_ * 100);
-    auto_scroll_timer_->start();
-}
-void main_window::increase_auto_speed()
-{
-    speed_++;
-    reset_auto_scroll_speed();
-}
-void main_window::decrease_auto_speed()
-{
-    speed_--;
-    reset_auto_scroll_speed();
-}
-
-void main_window::update_font_size(int new_size)
-{
-    new_size = std::max(new_size, 8);
-    new_size = std::min(new_size, 72);
-    QFont current_font = text_display_->font();
-    qDebug() << "current font size " << current_font.pointSize() << " new size " << new_size;
-    current_font.setPointSize(new_size);
-    text_display_->setFont(current_font);
-}
-
-void main_window::increase_font_size()
-{
-    QFont current_font = text_display_->font();
-    auto font_size = current_font.pointSize();
-    update_font_size(font_size + 2);
-}
-
-void main_window::decrease_font_size()
-{
-    QFont current_font = text_display_->font();
-    auto font_size = current_font.pointSize();
-    update_font_size(font_size + -2);
-}
-
 void main_window::setup_connections()
 {
-    connect(color_action_, &QAction::triggered, [this]() { on_color_action(); });
-    connect(add_speed_, &QAction::triggered, [this]() { increase_auto_speed(); });
-    connect(del_speed_, &QAction::triggered, [this]() { decrease_auto_speed(); });
-    connect(add_font_action_, &QAction::triggered, [this]() { increase_font_size(); });
-    connect(del_font_action_, &QAction::triggered, [this]() { decrease_font_size(); });
+    connect(color_action_, &QAction::triggered, this, &main_window::on_color_action);
+    connect(add_speed_, &QAction::triggered, this, &main_window::increase_auto_speed);
+    connect(del_speed_, &QAction::triggered, this, &main_window::decrease_auto_speed);
+    connect(add_font_action_, &QAction::triggered, this, &main_window::increase_font_size);
+    connect(del_font_action_, &QAction::triggered, this, &main_window::decrease_font_size);
     connect(auto_scroll_timer_, &QTimer::timeout, this, &main_window::perform_auto_scroll);
     connect(open_file_action_, &QAction::triggered, this, &main_window::open_file_dialog);
     connect(scroll_action_, &QAction::triggered, this, &main_window::auto_scroll_click);
     connect(toggle_list_action_, &QAction::triggered, this, &main_window::toggle_chapter_list_visibility);
-    connect(text_display_->verticalScrollBar(), &QScrollBar::valueChanged, this, &main_window::update_state_on_scroll);
+    // 【修改】连接到新的滚动处理槽
+    connect(scroll_bar_, &QScrollBar::valueChanged, this, &main_window::on_scroll_value_changed);
     connect(chapter_list_, &QListWidget::itemClicked, this, &main_window::on_chapter_list_item_clicked);
     connect(novel_manager_, &novel_manager::chapter_found, this, &main_window::on_chapter_found, Qt::QueuedConnection);
     connect(novel_manager_, &novel_manager::parsing_finished, this, &main_window::on_parsing_finished, Qt::QueuedConnection);
-}
-
-void main_window::toggle_auto_scroll()
-{
-    if (auto_scroll_timer_->isActive())
-    {
-        auto_scroll_timer_->stop();
-        statusBar()->showMessage("自动滚动已停止", 2000);
-    }
-    else
-    {
-        statusBar()->showMessage("自动滚动已开始", 2000);
-    }
-}
-
-void main_window::perform_auto_scroll()
-{
-    QScrollBar *scroll_bar = text_display_->verticalScrollBar();
-    if (scroll_bar->value() >= scroll_bar->maximum())
-    {
-        auto_scroll_timer_->stop();
-        statusBar()->showMessage("已滚动到底部，自动停止", 3000);
-    }
-    else
-    {
-        scroll_bar->setValue(scroll_bar->value() + 2);
-    }
-}
-
-void main_window::auto_scroll_click()
-{
-    if (auto_scroll_)
-    {
-        main_tool_bar_->removeAction(del_speed_);
-        main_tool_bar_->removeAction(add_speed_);
-        scroll_action_->setText("开启自动阅读");
-        auto_scroll_timer_->stop();
-    }
-    else
-    {
-        main_tool_bar_->addAction(add_speed_);
-        main_tool_bar_->addAction(del_speed_);
-        scroll_action_->setText("关闭自动阅读");
-        reset_auto_scroll_speed();
-    }
-    auto_scroll_ = !auto_scroll_;
-}
-
-void main_window::toggle_chapter_list_visibility()
-{
-    if (chapter_list_->isVisible())
-    {
-        chapter_list_->hide();
-    }
-    else
-    {
-        chapter_list_->show();
-    }
 }
 
 void main_window::open_file_dialog()
@@ -233,207 +112,314 @@ void main_window::open_file_dialog()
         setWindowTitle(QFileInfo(file_path).fileName() + " - TXT 小说阅读器");
         chapter_list_->clear();
         text_display_->clear();
-        loaded_chapter_indices_.clear();
+        displayed_chapter_indices_.clear();
         statusBar()->showMessage("正在解析章节，请稍候...");
         novel_manager_->load_file(file_path);
     }
 }
 
-void main_window::on_chapter_found(const QString &title) { chapter_list_->addItem(title); }
+void main_window::on_chapter_found(const QString& title) { chapter_list_->addItem(title); }
 
-void main_window::on_parsing_finished(int total_chapters)
+void main_window::on_parsing_finished(size_t total_chapters)
 {
     statusBar()->showMessage(QString("解析完成，共 %1 章。").arg(total_chapters), 5000);
     if (total_chapters > 0)
     {
-        load_chapter_to_display(0, false, false);
+        load_chapters_around(0);
     }
 }
 
-void main_window::on_chapter_list_item_clicked(QListWidgetItem *item)
+void main_window::on_chapter_list_item_clicked(QListWidgetItem* item)
 {
-    if ((item == nullptr) || is_updating_content_)
+    if ((item == nullptr) || is_loading_content_)
     {
         return;
     }
-    auto row = chapter_list_->row(item);
-    if (row == 0)
+    int row = chapter_list_->row(item);
+    load_chapters_around(row);
+}
+
+void main_window::on_scroll_value_changed(int value)
+{
+    if (is_loading_content_ || displayed_chapter_indices_.isEmpty())
     {
-        load_chapter_to_display(row, false, false);
         return;
     }
-    qDebug() << "chapter_list click";
-    load_chapter_to_display(row - 1, false, false);
-    load_chapter_to_display(row, true, true);
+
+    int max_value = scroll_bar_->maximum();
+
+    if (max_value > 0 && value >= max_value - kScrollLoadThreshold)
+    {
+        append_next_chapter();
+    }
+    else if (value <= kScrollLoadThreshold)
+    {
+        rebuild_document_for_prepend();
+    }
+
+    update_progress_status();
+}
+
+void main_window::load_chapters_around(int center_index)
+{
+    if (is_loading_content_ || novel_manager_->get_total_chapters() == 0)
+    {
+        return;
+    }
+
+    is_loading_content_ = true;
+    statusBar()->showMessage("正在加载章节...", 2000);
+
+    text_display_->clear();
+    displayed_chapter_indices_.clear();
+
+    size_t start_index = std::max<size_t>(0, center_index - 1);
+    size_t end_index = std::min<size_t>(novel_manager_->get_total_chapters() - 1, center_index + 1);
+
+    QString full_content;
+    for (size_t i = start_index; i <= end_index; ++i)
+    {
+        QString content = novel_manager_->get_chapter_content(static_cast<int>(i));
+        full_content.append(QString("<a name='ch_%1'></a>").arg(i));
+        full_content.append(content.toHtmlEscaped().replace("\n", "<br>"));
+        displayed_chapter_indices_.append(static_cast<int>(i));
+    }
+
+    text_display_->setHtml(full_content);
+
+    text_display_->scrollToAnchor(QString("ch_%1").arg(center_index));
+
+    is_loading_content_ = false;
+}
+
+void main_window::append_next_chapter()
+{
+    if (displayed_chapter_indices_.isEmpty())
+    {
+        return;
+    }
+
+    int last_loaded_index = displayed_chapter_indices_.last();
+    if (last_loaded_index >= novel_manager_->get_total_chapters() - 1)
+    {
+        return;
+    }
+
+    is_loading_content_ = true;
+
+    int next_index = last_loaded_index + 1;
+    QString content = novel_manager_->get_chapter_content(next_index);
+    QString html_content = QString("<a name='ch_%1'></a>").arg(next_index) + content.toHtmlEscaped().replace("\n", "<br>");
+
+    text_display_->append(html_content);
+    displayed_chapter_indices_.append(next_index);
+
+    if (displayed_chapter_indices_.size() > kChaptersInView)
+    {
+        displayed_chapter_indices_.removeFirst();
+        int first_chapter_after_trim = displayed_chapter_indices_.first();
+
+        QString rebuilt_content;
+        for (int index : displayed_chapter_indices_)
+        {
+            rebuilt_content.append(QString("<a name='ch_%1'></a>").arg(index));
+            rebuilt_content.append(novel_manager_->get_chapter_content(index).toHtmlEscaped().replace("\n", "<br>"));
+        }
+        text_display_->setHtml(rebuilt_content);
+
+        text_display_->scrollToAnchor(QString("ch_%1").arg(first_chapter_after_trim));
+    }
+
+    is_loading_content_ = false;
+}
+
+void main_window::rebuild_document_for_prepend()
+{
+    if (displayed_chapter_indices_.isEmpty())
+    {
+        return;
+    }
+
+    int first_loaded_index = displayed_chapter_indices_.first();
+    if (first_loaded_index <= 0)
+    {
+        return;
+    }
+
+    is_loading_content_ = true;
+
+    QTextCursor cursor = text_display_->cursorForPosition(QPoint(10, 10));
+    QTextBlock top_block = cursor.block();
+    QString anchor_to_restore = "";
+
+    while (top_block.isValid())
+    {
+        QTextCursor block_cursor(top_block);
+        block_cursor.select(QTextCursor::BlockUnderCursor);
+        QString blockHtml = block_cursor.selection().toHtml();
+        auto anchor_pos = blockHtml.indexOf("<a name=\"ch_");
+
+        if (anchor_pos != -1)
+        {
+            auto start = anchor_pos + 13;
+            auto end = blockHtml.indexOf('\"', start);
+            if (end != -1)
+            {
+                anchor_to_restore = blockHtml.mid(start, end - start);
+                break;
+            }
+        }
+        top_block = top_block.previous();
+    }
+
+    if (anchor_to_restore.isEmpty())
+    {
+        // 作为备用方案，如果找不到精确的锚点，就恢复到旧窗口的第一个章节
+        anchor_to_restore = QString("ch_%1").arg(first_loaded_index);
+    }
+
+    int new_first_index = first_loaded_index - 1;
+    displayed_chapter_indices_.prepend(new_first_index);
+
+    if (displayed_chapter_indices_.size() > kChaptersInView)
+    {
+        displayed_chapter_indices_.removeLast();
+    }
+
+    QString rebuilt_content;
+    for (int index : displayed_chapter_indices_)
+    {
+        rebuilt_content.append(QString("<a name='ch_%1'></a>").arg(index));
+        rebuilt_content.append(novel_manager_->get_chapter_content(index).toHtmlEscaped().replace("\n", "<br>"));
+    }
+
+    scroll_bar_->blockSignals(true);
+    text_display_->setHtml(rebuilt_content);
+
+    text_display_->scrollToAnchor(anchor_to_restore);
+    scroll_bar_->blockSignals(false);
+
+    is_loading_content_ = false;
 }
 
 void main_window::update_progress_status()
 {
-    int total_blocks = text_display_->document()->blockCount();
-    if (total_blocks <= 1)
+    if (displayed_chapter_indices_.isEmpty())
     {
         statusBar()->showMessage("进度: 0%");
         return;
     }
-    QPoint center_point = text_display_->viewport()->rect().center();
-    QTextCursor center_cursor = text_display_->cursorForPosition(center_point);
+    auto total = novel_manager_->get_total_chapters();
+    if (total == 0)
+    {
+        return;
+    }
 
-    int current_block = center_cursor.blockNumber();
-
-    double progress_ratio = static_cast<double>(current_block) / (total_blocks - 1);
+    int current_visible_chapter = displayed_chapter_indices_.first();
+    double progress_ratio = static_cast<double>(current_visible_chapter) / static_cast<double>(total);
     int percentage = qBound(0, static_cast<int>(progress_ratio * 100), 100);
 
-    statusBar()->showMessage(QString("进度: %1%").arg(percentage));
-
-    const QRect viewport_rect = text_display_->viewport()->rect();
-
-    QPoint top_point = viewport_rect.topLeft() + QPoint(kViewportSafeMargin, kViewportSafeMargin);
-    QPoint bottom_point = viewport_rect.bottomLeft() + QPoint(kViewportSafeMargin, -kViewportSafeMargin);
-
-    QTextCursor top_cursor = text_display_->cursorForPosition(top_point);
-    int top_block = top_cursor.blockNumber();
-
-    QTextCursor bottom_cursor = text_display_->cursorForPosition(bottom_point);
-    int bottom_block = bottom_cursor.blockNumber();
-
-    qDebug() << "1top_block " << top_block << " bottom_block " << bottom_block << " current_block " << current_block << " total_blocks "
-             << total_blocks;
-    // load next
-    if (bottom_block > total_blocks - 100)
-    {
-        int last_index = loaded_chapter_indices_.last();
-        if (last_index + 1 >= chapter_list_->count())
-        {
-            return;
-        }
-        QTextCursor cursor_before_load = text_display_->cursorForPosition(QPoint(10, 10));
-        load_chapter_to_display(last_index + 1, true, false);
-        QTextBlock block_to_restore = text_display_->document()->findBlockByNumber(cursor_before_load.blockNumber());
-        if (block_to_restore.isValid())
-        {
-            QTextCursor restore_cursor(block_to_restore);
-            text_display_->setTextCursor(restore_cursor);
-        }
-    }
-    // load prev
-    if (top_block < 100)
-    {
-        int first_index = loaded_chapter_indices_.first();
-        if (first_index <= 0)
-        {
-            return;
-        }
-        int old_scroll_value = scroll_bar_->value();
-        int old_max_value = scroll_bar_->maximum();
-        insert_chapter_to_display(first_index - 1);
-        int new_max_value = scroll_bar_->maximum();
-        scroll_bar_->setValue(old_scroll_value + (new_max_value - old_max_value));
-    }
+    statusBar()->showMessage(QString("进度: %1% (第 %2/%3 章)").arg(percentage).arg(current_visible_chapter + 1).arg(total));
 }
 
-void main_window::load_chapter_to_display(int load_index, bool append, bool fouce)
+void main_window::reset_auto_scroll_speed()
 {
-    if (is_updating_content_)
+    auto_scroll_timer_->stop();
+    speed_ = std::max(speed_, 10);
+    qDebug() << "speed " << speed_;
+    auto_scroll_timer_->setInterval(100 - speed_);
+    auto_scroll_timer_->start();
+}
+void main_window::increase_auto_speed()
+{
+    speed_ = std::min(95, speed_ + 5);
+    reset_auto_scroll_speed();
+}
+void main_window::decrease_auto_speed()
+{
+    speed_ = std::max(5, speed_ - 5);
+    reset_auto_scroll_speed();
+}
+void main_window::update_font_size(int new_size)
+{
+    new_size = std::max(new_size, 8);
+    new_size = std::min(new_size, 72);
+    QFont current_font = text_display_->font();
+    current_font.setPointSize(new_size);
+    text_display_->setFont(current_font);
+}
+void main_window::increase_font_size()
+{
+    QFont current_font = text_display_->font();
+    update_font_size(current_font.pointSize() + 2);
+}
+void main_window::decrease_font_size()
+{
+    QFont current_font = text_display_->font();
+    update_font_size(current_font.pointSize() - 2);
+}
+void main_window::perform_auto_scroll()
+{
+    if (scroll_bar_->value() >= scroll_bar_->maximum())
     {
-        return;
-    }
-    if (load_index >= chapter_list_->count())
-    {
-        return;
-    }
-    is_updating_content_ = true;
-
-    statusBar()->showMessage("正在加载章节...", 2000);
-
-    QString title = chapter_list_->item(load_index)->text();
-    QString content = novel_manager_->get_chapter_content(load_index);
-
-    qDebug() << "1load " << title << (append ? " append " : " insert ") << (fouce ? " fouce " : " no fouce");
-    if (append)
-    {
-        text_display_->appendPlainText(content);
+        auto_scroll_timer_->stop();
+        statusBar()->showMessage("已滚动到底部，自动停止", 3000);
     }
     else
     {
-        text_display_->clear();
-        loaded_chapter_indices_.clear();
-        text_display_->setPlainText(content);
+        scroll_bar_->setValue(scroll_bar_->value() + 1);
     }
-    if (fouce)
-    {
-        auto find = text_display_->find(title);
-        assert(find);
-        if (find)
-        {
-            text_display_->centerCursor();
-            QTextCursor cursor = text_display_->textCursor();
-            cursor.clearSelection();
-            text_display_->setTextCursor(cursor);
-        }
-    }
-    loaded_chapter_indices_.append(load_index);
-    is_updating_content_ = false;
 }
-
-void main_window::insert_chapter_to_display(int load_index)
+void main_window::auto_scroll_click()
 {
-    QString title = chapter_list_->item(load_index)->text();
-    qDebug() << "2load " << title << " insert " << "no fouce";
-    QString content = novel_manager_->get_chapter_content(load_index);
-    QTextCursor cursor(text_display_->document());
-    cursor.movePosition(QTextCursor::Start);
-    cursor.insertText(content);
-    loaded_chapter_indices_.prepend(load_index);
+    auto_scroll_ = !auto_scroll_;
+    if (auto_scroll_)
+    {
+        main_tool_bar_->addAction(add_speed_);
+        main_tool_bar_->addAction(del_speed_);
+        scroll_action_->setText("关闭自动阅读");
+        reset_auto_scroll_speed();
+    }
+    else
+    {
+        main_tool_bar_->removeAction(add_speed_);
+        main_tool_bar_->removeAction(del_speed_);
+        scroll_action_->setText("开启自动阅读");
+        auto_scroll_timer_->stop();
+    }
 }
-
-void main_window::update_state_on_scroll() { update_progress_status(); }
-
+void main_window::toggle_chapter_list_visibility() { chapter_list_->setVisible(!chapter_list_->isVisible()); }
 void main_window::on_color_action()
 {
     is_dynamic_background_ = !is_dynamic_background_;
-
     if (is_dynamic_background_)
     {
-        background_animation_timer_->start();
+        background_animation_timer_->start(50);
     }
     else
     {
         background_animation_timer_->stop();
     }
-
     update();
 }
-
 void main_window::update_background_gradient()
 {
     hue_ = (hue_ + 1) % 360;
-    gradient_offset_ = (gradient_offset_ + 1) % width();
-
-    if (is_dynamic_background_)
-    {
-        update();
-    }
+    update();
 }
-
-void main_window::paintEvent(QPaintEvent *event)
+void main_window::paintEvent(QPaintEvent* event)
 {
     Q_UNUSED(event);
     QPainter painter(this);
 
     if (is_dynamic_background_)
     {
-        int saturation = 80;
-        int value = 255;
+        QColor color1 = QColor::fromHsv(hue_, 150, 235);
+        QColor color2 = QColor::fromHsv((hue_ + 90) % 360, 150, 235);
 
-        QColor color1 = QColor::fromHsv(hue_, saturation, value);
-        QColor color2 = QColor::fromHsv((hue_ + 60) % 360, saturation, value);
-
-        QLinearGradient gradient(0, 0, width(), 0);
-
-        float pos = static_cast<float>(gradient_offset_) / width();
-        gradient.setColorAt(fmod(pos + 0.0, 1.0), color1);
-        gradient.setColorAt(fmod(pos + 0.5, 1.0), color2);
-        gradient.setColorAt(fmod(pos + 1.0, 1.0), color1);
+        QLinearGradient gradient(0, 0, 0, height());
+        gradient.setColorAt(0.0, color1);
+        gradient.setColorAt(1.0, color2);
         painter.fillRect(rect(), gradient);
     }
     else

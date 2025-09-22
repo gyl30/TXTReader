@@ -1,11 +1,11 @@
 #ifndef MAIN_WINDOW_H
 #define MAIN_WINDOW_H
 
-#include <qabstractspinbox.h>
-#include <qpushbutton.h>
-#include <qslider.h>
 #include <QMainWindow>
 #include <QList>
+#include <QPushButton>
+#include <QSlider>
+#include <QTextBrowser>
 
 class QListWidget;
 class QPlainTextEdit;
@@ -19,23 +19,23 @@ class main_window : public QMainWindow
     Q_OBJECT
 
    public:
-    explicit main_window(QWidget *parent = nullptr);
+    explicit main_window(QWidget* parent = nullptr);
     ~main_window();
 
    protected:
-    void paintEvent(QPaintEvent *event) override;
+    void paintEvent(QPaintEvent* event) override;
 
    private slots:
-    void toggle_chapter_list_visibility();
     void open_file_dialog();
-    void on_chapter_list_item_clicked(QListWidgetItem *item);
+    void toggle_chapter_list_visibility();
+    void on_chapter_list_item_clicked(QListWidgetItem* item);
 
-    void on_chapter_found(const QString &title);
-    void on_parsing_finished(int total_chapters);
+    void on_chapter_found(const QString& title);
+    void on_parsing_finished(size_t total_chapters);
 
-    void update_state_on_scroll();
+    void on_scroll_value_changed(int value);
     void update_progress_status();
-    void toggle_auto_scroll();
+
     void perform_auto_scroll();
     void auto_scroll_click();
 
@@ -44,41 +44,48 @@ class main_window : public QMainWindow
     void increase_font_size();
     void decrease_font_size();
     void update_background_gradient();
+    void on_color_action();
 
    private:
     void setup_ui();
     void setup_connections();
 
-    void load_chapter_to_display(int load_index, bool append, bool fouce);
-    void insert_chapter_to_display(int load_index);
+    void load_chapters_around(int center_index);
+    void append_next_chapter();
+    void rebuild_document_for_prepend();
+
     void reset_auto_scroll_speed();
     void update_font_size(int new_size);
-    void on_color_action();
 
    private:
+    // UI 和 动画相关
     int gradient_offset_ = 0;
     bool is_dynamic_background_ = false;
-    QTimer *background_animation_timer_;
+    QTimer* background_animation_timer_;
     int hue_;
-    QTimer *auto_scroll_timer_;
-    QListWidget *chapter_list_;
-    QPlainTextEdit *text_display_;
+    QTimer* auto_scroll_timer_;
+    QListWidget* chapter_list_;
+    QTextBrowser* text_display_;
+    QSplitter* splitter_;
+    QScrollBar* scroll_bar_;
+    QToolBar* main_tool_bar_;
+
+    // 动作 Action
+    QAction* open_file_action_;
+    QAction* color_action_;
+    QAction* toggle_list_action_;
+    QAction* add_font_action_;
+    QAction* del_font_action_;
+    QAction* scroll_action_;
+    QAction* add_speed_;
+    QAction* del_speed_;
+
     bool auto_scroll_ = false;
-    int speed_ = 80;
-    QAction *add_speed_;
-    QAction *del_speed_;
-    QAction *add_font_action_;
-    QAction *del_font_action_;
-    QSplitter *splitter_;
-    QAction *scroll_action_;
-    QScrollBar *scroll_bar_;
-    QAction *open_file_action_;
-    QAction *color_action_;
-    QToolBar *main_tool_bar_;
-    QAction *toggle_list_action_;
-    novel_manager *novel_manager_;
-    QList<int> loaded_chapter_indices_;
-    bool is_updating_content_;
+    int speed_ = 30;
+
+    novel_manager* novel_manager_;
+    QList<int> displayed_chapter_indices_;
+    bool is_loading_content_ = false;
 };
 
 #endif    // MAIN_WINDOW_H

@@ -23,6 +23,7 @@ class novel_manager : public QObject
 
     void load_file(const QString& file_path);
     QString get_chapter_content(int chapter_index);
+    [[nodiscard]] size_t get_total_chapters() const { return chapters_.size(); }
 
    signals:
     void chapter_found(const QString& title);
@@ -33,7 +34,7 @@ class novel_manager : public QObject
 
    private:
     QThread* worker_thread_;
-    QByteArray file_content_;
+    QString file_path_;
     std::vector<chapter_info> chapters_;
 };
 
