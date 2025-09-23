@@ -38,6 +38,7 @@ add_executable(TXTReader
     main_window.cpp
     novel_manager.h
     novel_manager.cpp
+    novel_view.cpp
 )
 
 target_link_libraries(TXTReader

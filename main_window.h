@@ -1,18 +1,17 @@
-#ifndef MAIN_WINDOW_H
-#define MAIN_WINDOW_H
+#ifndef TXTREADER_MAIN_WINDOW_H
+#define TXTREADER_MAIN_WINDOW_H
 
 #include <QMainWindow>
 #include <QList>
-#include <QPushButton>
-#include <QSlider>
-#include <QTextBrowser>
 
 class QListWidget;
-class QPlainTextEdit;
 class QSplitter;
 class novel_manager;
 class QListWidgetItem;
-class QScrollBar;
+class QTimer;
+class QAction;
+class QToolBar;
+class NovelView;
 
 class main_window : public QMainWindow
 {
@@ -33,12 +32,12 @@ class main_window : public QMainWindow
     void on_chapter_found(const QString& title);
     void on_parsing_finished(size_t total_chapters);
 
-    void on_scroll_value_changed(int value);
-    void update_progress_status();
+    void load_previous_chapter(int currentFirstIndex);
+    void load_next_chapter(int currentLastIndex);
 
+    void update_progress_status();
     void perform_auto_scroll();
     void auto_scroll_click();
-
     void increase_auto_speed();
     void decrease_auto_speed();
     void increase_font_size();
@@ -53,28 +52,22 @@ class main_window : public QMainWindow
    private:
     void setup_ui();
     void setup_connections();
-
     void update_text_style();
-    void load_chapters_around(int center_index);
-    void append_next_chapter();
-
+    void load_chapter(int chapterIndex);
     void reset_auto_scroll_speed();
     void update_font_size(int new_size);
 
    private:
-    // UI 和 动画相关
     int gradient_offset_ = 0;
     bool is_dynamic_background_ = false;
     QTimer* background_animation_timer_;
     int hue_;
     QTimer* auto_scroll_timer_;
     QListWidget* chapter_list_;
-    QTextBrowser* text_display_;
+    NovelView* novel_view_;
     QSplitter* splitter_;
-    QScrollBar* scroll_bar_;
     QToolBar* main_tool_bar_;
 
-    // 动作 Action
     QAction* open_file_action_;
     QAction* color_action_;
     QAction* toggle_list_action_;
@@ -87,14 +80,15 @@ class main_window : public QMainWindow
     QAction* del_line_spacing_action_;
     QAction* add_letter_spacing_action_;
     QAction* del_letter_spacing_action_;
+
     bool auto_scroll_ = false;
     int speed_ = 30;
     int font_size_ = 38;
-    qreal line_spacing_ = 9.0;
-    qreal letter_spacing_ = 9.5;
+    qreal line_spacing_ = 1.5;
+    qreal letter_spacing_ = 1.5;
+
     novel_manager* novel_manager_;
-    QList<int> displayed_chapter_indices_;
     bool is_loading_content_ = false;
 };
 
-#endif    // MAIN_WINDOW_H
+#endif
