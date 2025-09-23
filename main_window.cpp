@@ -17,14 +17,14 @@
 #include "main_window.h"
 #include "novel_manager.h"
 
-static const int kChaptersInView = 5;
+static const int kChaptersInView = 50;
 static const int kScrollLoadThreshold = 500;
 
 main_window::main_window(QWidget* parent) : QMainWindow(parent), novel_manager_(new novel_manager())
 {
     setup_ui();
     setup_connections();
-    update_font_size(24);
+    update_font_size(font_size_);
     hue_ = 180;
     background_animation_timer_ = new QTimer(this);
     connect(background_animation_timer_, &QTimer::timeout, this, &main_window::update_background_gradient);
@@ -225,10 +225,6 @@ void main_window::on_scroll_value_changed(int value)
     {
         append_next_chapter();
     }
-    else if (value <= kScrollLoadThreshold)
-    {
-        rebuild_document_for_prepend();
-    }
 
     update_progress_status();
 }
@@ -286,90 +282,6 @@ void main_window::append_next_chapter()
 
     text_display_->append(html_content);
     displayed_chapter_indices_.append(next_index);
-
-    if (displayed_chapter_indices_.size() > kChaptersInView)
-    {
-        displayed_chapter_indices_.removeFirst();
-        int first_chapter_after_trim = displayed_chapter_indices_.first();
-
-        QString rebuilt_content;
-        for (int index : displayed_chapter_indices_)
-        {
-            rebuilt_content.append(QString("<a name='ch_%1'></a>").arg(index));
-            rebuilt_content.append(novel_manager_->get_chapter_content(index).toHtmlEscaped().replace("\n", "<br>"));
-        }
-        text_display_->setHtml(rebuilt_content);
-
-        text_display_->scrollToAnchor(QString("ch_%1").arg(first_chapter_after_trim));
-    }
-
-    is_loading_content_ = false;
-}
-
-void main_window::rebuild_document_for_prepend()
-{
-    if (displayed_chapter_indices_.isEmpty())
-    {
-        return;
-    }
-
-    int first_loaded_index = displayed_chapter_indices_.first();
-    if (first_loaded_index <= 0)
-    {
-        return;
-    }
-
-    is_loading_content_ = true;
-
-    QTextCursor cursor = text_display_->cursorForPosition(QPoint(10, 10));
-    QTextBlock top_block = cursor.block();
-    QString anchor_to_restore = "";
-
-    while (top_block.isValid())
-    {
-        QTextCursor block_cursor(top_block);
-        block_cursor.select(QTextCursor::BlockUnderCursor);
-        QString blockHtml = block_cursor.selection().toHtml();
-        auto anchor_pos = blockHtml.indexOf("<a name=\"ch_");
-        if (anchor_pos != -1)
-        {
-            auto start = anchor_pos + 13;
-            auto end = blockHtml.indexOf('\"', start);
-            if (end != -1)
-            {
-                anchor_to_restore = blockHtml.mid(start, end - start);
-                break;
-            }
-        }
-        top_block = top_block.previous();
-    }
-
-    if (anchor_to_restore.isEmpty())
-    {
-        anchor_to_restore = QString("ch_%1").arg(first_loaded_index);
-    }
-
-    int new_first_index = first_loaded_index - 1;
-    displayed_chapter_indices_.prepend(new_first_index);
-
-    if (displayed_chapter_indices_.size() > kChaptersInView)
-    {
-        displayed_chapter_indices_.removeLast();
-    }
-
-    QString rebuilt_content;
-    for (int index : displayed_chapter_indices_)
-    {
-        rebuilt_content.append(QString("<a name='ch_%1'></a>").arg(index));
-        rebuilt_content.append(novel_manager_->get_chapter_content(index).toHtmlEscaped().replace("\n", "<br>"));
-    }
-
-    scroll_bar_->blockSignals(true);
-    text_display_->setHtml(rebuilt_content);
-
-    text_display_->scrollToAnchor(anchor_to_restore);
-    scroll_bar_->blockSignals(false);
-
     is_loading_content_ = false;
 }
 

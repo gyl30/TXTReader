@@ -57,7 +57,6 @@ class main_window : public QMainWindow
     void update_text_style();
     void load_chapters_around(int center_index);
     void append_next_chapter();
-    void rebuild_document_for_prepend();
 
     void reset_auto_scroll_speed();
     void update_font_size(int new_size);
@@ -90,9 +89,9 @@ class main_window : public QMainWindow
     QAction* del_letter_spacing_action_;
     bool auto_scroll_ = false;
     int speed_ = 30;
-    int font_size_ = 24;
-    qreal line_spacing_ = 5.0;
-    qreal letter_spacing_ = 1.5;
+    int font_size_ = 38;
+    qreal line_spacing_ = 9.0;
+    qreal letter_spacing_ = 9.5;
     novel_manager* novel_manager_;
     QList<int> displayed_chapter_indices_;
     bool is_loading_content_ = false;
