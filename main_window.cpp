@@ -419,22 +419,18 @@ void main_window::update_font_size(int new_size)
 {
     new_size = std::max(new_size, 8);
     new_size = std::min(new_size, 72);
+    font_size_ = new_size;
     QFont current_font = text_display_->font();
     auto font_size = current_font.pointSize();
-    LOG_INFO("current font size {} to {}", font_size, new_size);
+    LOG_INFO("current font size {} to {}", font_size, font_size_);
     current_font.setPointSize(new_size);
     text_display_->setFont(current_font);
 }
-void main_window::increase_font_size()
-{
-    QFont current_font = text_display_->font();
-    update_font_size(current_font.pointSize() + 2);
-}
-void main_window::decrease_font_size()
-{
-    QFont current_font = text_display_->font();
-    update_font_size(current_font.pointSize() - 2);
-}
+
+void main_window::increase_font_size() { update_font_size(font_size_ + 2); }
+
+void main_window::decrease_font_size() { update_font_size(font_size_ - 2); }
+
 void main_window::perform_auto_scroll()
 {
     if (scroll_bar_->value() >= scroll_bar_->maximum())
