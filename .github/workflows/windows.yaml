@@ -47,7 +47,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ runner.temp }}/boost
-          key: ${{ runner.os }}-mingw-boost-regex-only-${{ env.BOOST_VERSION }}
+          key: ${{ runner.os }}-mingw-boost-regex-locale-${{ env.BOOST_VERSION }}
 
       - name: Build Boost from source
         if: steps.cache-boost.outputs.cache-hit != 'true'
