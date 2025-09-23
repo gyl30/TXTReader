@@ -4,7 +4,7 @@
 #include <QObject>
 #include <QString>
 #include <vector>
-
+#include <string>
 class QThread;
 
 struct chapter_info
@@ -19,7 +19,7 @@ class novel_manager : public QObject
 
    public:
     explicit novel_manager(QObject* parent = nullptr);
-    ~novel_manager();
+    ~novel_manager() override;
 
     void load_file(const QString& file_path);
     QString get_chapter_content(size_t chapter_index);
@@ -36,6 +36,8 @@ class novel_manager : public QObject
     QThread* worker_thread_;
     QString file_path_;
     std::vector<chapter_info> chapters_;
+    std::string content_;
+    std::string detected_encoding_;
 };
 
 #endif    // NOVEL_MANAGER_H

@@ -33,6 +33,7 @@ jobs:
           msystem: MINGW64
           update: true
           install: >-
+            mingw-w64-x86_64-uchardet
             mingw-w64-x86_64-toolchain
             mingw-w64-x86_64-cmake
             mingw-w64-x86_64-ninja
@@ -69,7 +70,7 @@ jobs:
           ./b2 install -j$(nproc) \
             toolset=gcc \
             --prefix="$TEMP_DIR_NIX/boost" \
-            --with-regex
+            --with-regex --with-locale
 
       - name: Set BOOST_ROOT environment variable
         shell: msys2 {0}

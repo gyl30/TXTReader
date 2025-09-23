@@ -1,18 +1,19 @@
-#include <QDebug>
-#include <QTextDocumentFragment>
-#include <QFileDialog>
-#include <QFileInfo>
+#include <QTimer>
 #include <QMenuBar>
 #include <QPainter>
+#include <QToolBar>
+#include <QFileInfo>
 #include <QScrollBar>
-#include <QListWidget>
 #include <QStatusBar>
 #include <QTextBlock>
 #include <QTextCursor>
-#include <QTimer>
-#include <QToolBar>
+#include <QFileDialog>
+#include <QListWidget>
+#include <QTextDocumentFragment>
 #include <algorithm>
+#include "log.h"
 #include "splitter.h"
+#include "scoped_exit.h"
 #include "main_window.h"
 #include "novel_manager.h"
 
@@ -27,8 +28,7 @@ main_window::main_window(QWidget* parent) : QMainWindow(parent), novel_manager_(
     hue_ = 180;
     background_animation_timer_ = new QTimer(this);
     connect(background_animation_timer_, &QTimer::timeout, this, &main_window::update_background_gradient);
-    this->setStyleSheet(
-        "QSplitter, QPlainTextEdit, QListWidget, QToolBar, QStatusBar, QTextBrowser { background-color: transparent; border: none; }");
+    this->setStyleSheet("QSplitter, QListWidget, QToolBar, QStatusBar, QTextBrowser { background-color: transparent; border: none; }");
 }
 
 main_window::~main_window() { delete novel_manager_; }
@@ -61,7 +61,6 @@ void main_window::setup_ui()
     main_tool_bar_->addAction(del_line_spacing_action_);
     main_tool_bar_->addSeparator();
 
-    // 添加字间距调整按钮
     add_letter_spacing_action_ = new QAction("字距 +", this);
     del_letter_spacing_action_ = new QAction("字距 -", this);
     main_tool_bar_->addAction(add_letter_spacing_action_);
@@ -114,7 +113,6 @@ void main_window::setup_connections()
     connect(open_file_action_, &QAction::triggered, this, &main_window::open_file_dialog);
     connect(scroll_action_, &QAction::triggered, this, &main_window::auto_scroll_click);
     connect(toggle_list_action_, &QAction::triggered, this, &main_window::toggle_chapter_list_visibility);
-    // 【修改】连接到新的滚动处理槽
     connect(scroll_bar_, &QScrollBar::valueChanged, this, &main_window::on_scroll_value_changed);
     connect(chapter_list_, &QListWidget::itemClicked, this, &main_window::on_chapter_list_item_clicked);
     connect(novel_manager_, &novel_manager::chapter_found, this, &main_window::on_chapter_found, Qt::QueuedConnection);
@@ -149,25 +147,33 @@ void main_window::update_text_style()
 }
 void main_window::increase_line_spacing()
 {
+    auto line_spacing = line_spacing_;
     line_spacing_ += 1.0;
+    LOG_INFO("increased line spacing {} to {}", line_spacing, line_spacing_);
     update_text_style();
 }
 
 void main_window::decrease_line_spacing()
 {
+    auto line_spacing = line_spacing_;
     line_spacing_ = std::max(0.0, line_spacing_ - 1.0);
+    LOG_INFO("decreased line spacing {} to {}", line_spacing, line_spacing_);
     update_text_style();
 }
 
 void main_window::increase_letter_spacing()
 {
+    auto letter_spacing = letter_spacing_;
     letter_spacing_ += 1.0;
+    LOG_INFO("increased letter spacing {} to {}", letter_spacing, letter_spacing_);
     update_text_style();
 }
 
 void main_window::decrease_letter_spacing()
 {
+    auto letter_spacing = letter_spacing_;
     letter_spacing_ = std::max(0.0, letter_spacing_ - 1.0);
+    LOG_INFO("decreased letter spacing {} to {}", letter_spacing, letter_spacing_);
     update_text_style();
 }
 
@@ -214,7 +220,7 @@ void main_window::on_scroll_value_changed(int value)
     }
 
     int max_value = scroll_bar_->maximum();
-
+    LOG_INFO("scroll value {} max value {}", value, max_value);
     if (max_value > 0 && value >= max_value - kScrollLoadThreshold)
     {
         append_next_chapter();
@@ -325,7 +331,6 @@ void main_window::rebuild_document_for_prepend()
         block_cursor.select(QTextCursor::BlockUnderCursor);
         QString blockHtml = block_cursor.selection().toHtml();
         auto anchor_pos = blockHtml.indexOf("<a name=\"ch_");
-
         if (anchor_pos != -1)
         {
             auto start = anchor_pos + 13;
@@ -398,12 +403,16 @@ void main_window::reset_auto_scroll_speed()
 }
 void main_window::increase_auto_speed()
 {
+    auto speed = speed_;
     speed_ = std::min(95, speed_ + 5);
+    LOG_INFO("increased speed {} to {}", speed, speed_);
     reset_auto_scroll_speed();
 }
 void main_window::decrease_auto_speed()
 {
+    auto speed = speed_;
     speed_ = std::max(5, speed_ - 5);
+    LOG_INFO("decreased speed {} to {}", speed, speed_);
     reset_auto_scroll_speed();
 }
 void main_window::update_font_size(int new_size)
@@ -411,6 +420,8 @@ void main_window::update_font_size(int new_size)
     new_size = std::max(new_size, 8);
     new_size = std::min(new_size, 72);
     QFont current_font = text_display_->font();
+    auto font_size = current_font.pointSize();
+    LOG_INFO("current font size {} to {}", font_size, new_size);
     current_font.setPointSize(new_size);
     text_display_->setFont(current_font);
 }
@@ -455,6 +466,7 @@ void main_window::auto_scroll_click()
     }
 }
 void main_window::toggle_chapter_list_visibility() { chapter_list_->setVisible(!chapter_list_->isVisible()); }
+
 void main_window::on_color_action()
 {
     is_dynamic_background_ = !is_dynamic_background_;
