@@ -20,14 +20,7 @@ main_window::main_window(QWidget* parent) : QMainWindow(parent), novel_manager_(
 {
     setup_ui();
     setup_connections();
-    update_text_style();
-    chapter_list_->setStyleSheet(R"(
-    QScrollBar:vertical { background: transparent; width: 10px; margin: 0px; }
-    QScrollBar::handle:vertical { background: rgba(120,120,120,120); border-radius: 7px; min-height: 60px; }
-    QScrollBar::handle:vertical:hover { background: rgba(80,80,80,180); }
-    QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; }
-    QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: transparent; }
-    )");
+    novel_view_->setFontStyle(font_size_, line_spacing_, letter_spacing_);
     this->setStyleSheet("QSplitter, QListWidget, QToolBar, QStatusBar, QAbstractScrollArea { background-color: transparent; border: none; }");
 }
 
@@ -40,11 +33,6 @@ void main_window::setup_ui()
 
     chapter_list_ = new QListWidget(splitter_);
     chapter_list_->setFixedWidth(250);
-    auto* effect = new QGraphicsDropShadowEffect(this);
-    effect->setBlurRadius(15);
-    effect->setOffset(0, 0);
-    effect->setColor(Qt::black);
-    chapter_list_->setGraphicsEffect(effect);
 
     novel_view_ = new NovelView(splitter_);
     novel_view_->setFrameShape(QFrame::NoFrame);
@@ -236,40 +224,37 @@ void main_window::update_progress_status()
     }
 }
 
-void main_window::update_text_style()
+void main_window::increase_font_size()
 {
-    QFont font("Microsoft YaHei", font_size_);
-    novel_view_->setFontStyle(font, line_spacing_, letter_spacing_);
+    font_size_ += 2.0;
+    novel_view_->setFontStyle(font_size_, line_spacing_, letter_spacing_);
 }
-
-void main_window::increase_font_size() { update_font_size(font_size_ + 2); }
-void main_window::decrease_font_size() { update_font_size(font_size_ - 2); }
-void main_window::update_font_size(int new_size)
+void main_window::decrease_font_size()
 {
-    font_size_ = qMax(10, new_size);
-    update_text_style();
+    font_size_ -= 2.0;
+    novel_view_->setFontStyle(font_size_, line_spacing_, letter_spacing_);
 }
 
 void main_window::increase_line_spacing()
 {
     line_spacing_ += 0.1;
-    update_text_style();
+    novel_view_->setFontStyle(font_size_, line_spacing_, letter_spacing_);
 }
 void main_window::decrease_line_spacing()
 {
     line_spacing_ = qMax(0.5, line_spacing_ - 0.1);
-    update_text_style();
+    novel_view_->setFontStyle(font_size_, line_spacing_, letter_spacing_);
 }
 
 void main_window::increase_letter_spacing()
 {
     letter_spacing_ += 0.5;
-    update_text_style();
+    novel_view_->setFontStyle(font_size_, line_spacing_, letter_spacing_);
 }
 void main_window::decrease_letter_spacing()
 {
     letter_spacing_ = qMax(0.0, letter_spacing_ - 0.5);
-    update_text_style();
+    novel_view_->setFontStyle(font_size_, line_spacing_, letter_spacing_);
 }
 
 void main_window::perform_auto_scroll()

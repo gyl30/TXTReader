@@ -52,10 +52,8 @@ class main_window : public QMainWindow
    private:
     void setup_ui();
     void setup_connections();
-    void update_text_style();
     void load_chapter(int chapterIndex);
     void reset_auto_scroll_speed();
-    void update_font_size(int new_size);
 
    private:
     int gradient_offset_ = 0;
@@ -83,7 +81,7 @@ class main_window : public QMainWindow
 
     bool auto_scroll_ = false;
     int speed_ = 30;
-    int font_size_ = 38;
+    qreal font_size_ = 38.0;
     qreal line_spacing_ = 1.5;
     qreal letter_spacing_ = 1.5;
 

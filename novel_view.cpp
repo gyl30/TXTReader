@@ -11,13 +11,13 @@ NovelView::NovelView(QWidget* parent) : QAbstractScrollArea(parent)
     connect(verticalScrollBar(), &QScrollBar::valueChanged, this, &NovelView::onScrollValueChanged);
 }
 
-void NovelView::setFontStyle(const QFont& font, qreal lineSpacing, qreal letterSpacing)
+void NovelView::setFontStyle(qreal font_size, qreal lineSpacing, qreal letterSpacing)
 {
-    font_ = font;
+    font_.setPointSizeF(font_size);
     font_.setLetterSpacing(QFont::AbsoluteSpacing, letterSpacing);
     lineSpacing_ = lineSpacing;
     letterSpacing_ = letterSpacing;
-    paragraphSpacing_ = font.pointSizeF();
+    paragraphSpacing_ = font_size;
     relayoutAndRedraw();
 }
 
@@ -222,7 +222,9 @@ void NovelView::relayoutAllChapters()
             {
                 QTextLine line = para.text_layout->createLine();
                 if (!line.isValid())
+                {
                     break;
+                }
                 line.setLineWidth(viewport()->width());
                 line.setPosition(QPointF(0, paraHeight));
                 paraHeight += line.height() * lineSpacing_;
