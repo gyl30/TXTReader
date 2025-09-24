@@ -21,7 +21,9 @@ main_window::main_window(QWidget* parent) : QMainWindow(parent), novel_manager_(
     setup_ui();
     setup_connections();
     novel_view_->setFontStyle(font_size_, line_spacing_, letter_spacing_);
-    this->setStyleSheet("QSplitter, QListWidget, QToolBar, QStatusBar, QAbstractScrollArea { background-color: transparent; border: none; }");
+    setStyleSheet("QSplitter, QListWidget, QToolBar, QStatusBar, QAbstractScrollArea { background-color: transparent; border: none; }");
+    setWindowTitle("TXT 小说阅读器");
+    resize(1024, 768);
 }
 
 main_window::~main_window() = default;
@@ -33,13 +35,21 @@ void main_window::setup_ui()
 
     chapter_list_ = new QListWidget(splitter_);
     chapter_list_->setFixedWidth(250);
-
+    chapter_list_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    chapter_list_->setStyleSheet(R"(
+    QScrollBar:vertical { background: transparent; width: 10px; margin: 0px; }
+    QScrollBar::handle:vertical { background: rgba(120,120,120,120); border-radius: 7px; min-height: 60px; }
+    QScrollBar::handle:vertical:hover { background: rgba(80,80,80,180); }
+    QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; }
+    QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: transparent; }
+    )");
     novel_view_ = new NovelView(splitter_);
     novel_view_->setFrameShape(QFrame::NoFrame);
     splitter_->addWidget(chapter_list_);
     splitter_->addWidget(novel_view_);
 
     main_tool_bar_ = addToolBar("Main");
+    main_tool_bar_->setMovable(false);
     open_file_action_ = main_tool_bar_->addAction("打开");
     toggle_list_action_ = main_tool_bar_->addAction("目录");
     add_font_action_ = main_tool_bar_->addAction("字体+");
@@ -58,6 +68,7 @@ void main_window::setup_ui()
     hue_ = 0;
 
     statusBar()->showMessage("就绪");
+    statusBar()->setSizeGripEnabled(false);
 }
 
 void main_window::setup_connections()

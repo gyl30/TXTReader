@@ -9,6 +9,8 @@ NovelView::NovelView(QWidget* parent) : QAbstractScrollArea(parent)
 {
     verticalScrollBar()->setSingleStep(20);
     connect(verticalScrollBar(), &QScrollBar::valueChanged, this, &NovelView::onScrollValueChanged);
+    verticalScrollBar()->setVisible(false);
+    horizontalScrollBar()->setVisible(false);
 }
 
 void NovelView::setFontStyle(qreal font_size, qreal lineSpacing, qreal letterSpacing)
