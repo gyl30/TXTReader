@@ -5,12 +5,14 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_VERBOSE_MAKEFILE ON)
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 find_package(Qt6 REQUIRED COMPONENTS Widgets Core)
 
+set(Boost_USE_STATIC_LIBS ON)
 set(Boost_USE_DEBUG_LIBS ON)
 set(Boost_USE_RELEASE_LIBS ON)
 set(Boost_USE_MULTITHREADED ON)
@@ -23,12 +25,9 @@ include_directories(third/spdlog/include)
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(uchardet REQUIRED IMPORTED_TARGET uchardet)
-
-message(STATUS "uchardet found: ${uchardet_VERSION}")
-message(STATUS "uchardet includes: ${uchardet_INCLUDE_DIRS}")
-message(STATUS "uchardet libraries: ${uchardet_LIBRARIES}")
-message(STATUS "uchardet link: ${uchardet_LDFLAGS}")
-
+message(STATUS "STATIC_LIBRARIES: ${uchardet_STATIC_LIBRARIES}")
+message(STATUS "STATIC_LDFLAGS: ${uchardet_STATIC_LDFLAGS}")
+message(STATUS "STATIC_LDFLAGS_OTHER: ${uchardet_STATIC_LDFLAGS_OTHER}")
 
 add_executable(TXTReader
     main.cpp
@@ -46,7 +45,7 @@ target_link_libraries(TXTReader
     Qt6::Widgets
     Qt6::Core
     ${Boost_LIBRARIES}
-    PkgConfig::uchardet
+    ${uchardet_STATIC_LIBRARIES}
 )
 if(WIN32)
     set_target_properties(TXTReader PROPERTIES WIN32_EXECUTABLE ON)

@@ -75,20 +75,25 @@ jobs:
           echo "--- Dependency packaging complete ---"
           ls -R "$INSTALL_DIR"
 
+      - name: Prepare for Archiving
+        shell: msys2 {0}
+        run: |
+          PACKAGE_DIR="${{ env.EXECUTABLE_NAME }}-mingw-x64-${{ matrix.build_type }}"
+          ARCHIVE_NAME="${PACKAGE_DIR}.zip"
+          mv install/bin "$PACKAGE_DIR"
+          echo "PACKAGE_DIR=$PACKAGE_DIR" >> $GITHUB_ENV
+          echo "ARCHIVE_PATH=$ARCHIVE_NAME" >> $GITHUB_ENV
+          echo "--- Prepared directory structure for archiving ---"
+          ls -R "$PACKAGE_DIR"
       - name: Create Archive
         shell: msys2 {0}
         run: |
-          ARCHIVE_NAME="${{ env.EXECUTABLE_NAME }}-mingw-x64-${{ matrix.build_type }}.zip"
-          cd install
-          7z a "../$ARCHIVE_NAME" ./*
-          cd ..
-          echo "ARCHIVE_PATH=$ARCHIVE_NAME" >> $GITHUB_ENV
-
+          7z a "${{ env.ARCHIVE_PATH }}" "${{ env.PACKAGE_DIR }}/"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.EXECUTABLE_NAME }}-mingw-x64-${{ matrix.build_type }}
+          name: ${{ env.PACKAGE_DIR }}
           path: ${{ env.ARCHIVE_PATH }}
 
       - name: Upload to Release
