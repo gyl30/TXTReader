@@ -33,7 +33,6 @@ jobs:
           msystem: MINGW64
           update: true
           install: >-
-            mingw-w64-x86_64-uchardet
             mingw-w64-x86_64-toolchain
             mingw-w64-x86_64-cmake
             mingw-w64-x86_64-ninja
@@ -43,12 +42,25 @@ jobs:
             p7zip
             wget
 
+      - name: Configure uchardet
+        shell: msys2 {0}
+        run: |
+          cmake -S third/uchardet -B third/uchardet/build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DBUILD_STATIC=ON -DBUILD_BINARY=OFF -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/build/deps -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+
+      - name: Build uchardet
+        shell: msys2 {0}
+        run: cmake --build third/uchardet/build --config Release
+
+      - name: Install uchardet
+        shell: msys2 {0}
+        run: cmake --install third/uchardet/build --config Release
+
       - name: Configure CMake
         shell: msys2 {0}
         run: |
           cmake -S . -B build/${{ matrix.build_type }} \
                 -G Ninja \
-                -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+                -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DCMAKE_PREFIX_PATH=${{ github.workspace }}/build/deps
 
       - name: Build with CMake
         shell: msys2 {0}

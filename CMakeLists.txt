@@ -19,15 +19,16 @@ set(Boost_USE_MULTITHREADED ON)
 set(Boost_USE_STATIC_RUNTIME OFF)
 find_package(Boost 1.83.0 REQUIRED COMPONENTS regex locale)
 include_directories(${Boost_INCLUDE_DIRS})
+message(STATUS "Found Boost:    V${Boost_VERSION} (in ${Boost_DIR})")
 
-
-include_directories(third/spdlog/include)
-
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(uchardet REQUIRED IMPORTED_TARGET uchardet)
-message(STATUS "STATIC_LIBRARIES: ${uchardet_STATIC_LIBRARIES}")
-message(STATUS "STATIC_LDFLAGS: ${uchardet_STATIC_LDFLAGS}")
-message(STATUS "STATIC_LDFLAGS_OTHER: ${uchardet_STATIC_LDFLAGS_OTHER}")
+find_package(uchardet REQUIRED)
+message(STATUS "Found uchardet: V${uchardet_VERSION} (in ${uchardet_DIR})")
+get_filename_component(UCHARDET_CONFIG_PATH "${uchardet_DIR}" REALPATH)
+get_filename_component(UCHARDET_INSTALL_PREFIX "${UCHARDET_CONFIG_PATH}" DIRECTORY)
+get_filename_component(UCHARDET_INSTALL_PREFIX "${UCHARDET_INSTALL_PREFIX}" DIRECTORY)
+get_filename_component(UCHARDET_INSTALL_PREFIX "${UCHARDET_INSTALL_PREFIX}" DIRECTORY)
+set(UCHARDET_INCLUDE_DIR "${UCHARDET_INSTALL_PREFIX}/include")
+message(STATUS "Uchardet include path: ${UCHARDET_INCLUDE_DIR}")
 
 add_executable(TXTReader
     main.cpp
@@ -40,13 +41,21 @@ add_executable(TXTReader
     novel_view.cpp
 )
 
+target_include_directories(TXTReader
+    PRIVATE
+    ${Boost_INCLUDE_DIRS}
+    third/spdlog/include
+    ${UCHARDET_INCLUDE_DIR}
+)
+
 target_link_libraries(TXTReader
     PRIVATE
     Qt6::Widgets
     Qt6::Core
     ${Boost_LIBRARIES}
-    ${uchardet_STATIC_LIBRARIES}
+    uchardet::libuchardet
 )
+
 if(WIN32)
     set_target_properties(TXTReader PROPERTIES WIN32_EXECUTABLE ON)
 endif()
