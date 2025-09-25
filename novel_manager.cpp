@@ -1,4 +1,5 @@
 #include <QFile>
+#include <QFileInfo>
 #include <boost/locale.hpp>
 #include <boost/regex.hpp>
 #include <uchardet/uchardet.h>
@@ -94,60 +95,72 @@ void novel_manager::parse_chapters_async()
     std::string encoding_str;
     try
     {
-        encoding_str = boost::locale::conv::from_utf(utf8_str, detected_encoding_);
+        encoding_str = boost::locale::conv::from_utf(utf8_str, detected_encoding_, boost::locale::conv::method_type::stop);
     }
     catch (const boost::locale::conv::conversion_error& e)
     {
         LOG_ERROR("regular expression encoding conversion failed {} encoding {} {}", utf8_str, detected_encoding_, e.what());
         emit parsing_finished(0);
-        return;
     }
-    LOG_INFO("regular expression encoding {} encoding {} {}", utf8_str, detected_encoding_, encoding_str);
-
-    boost::regex chapter_pattern;
-    try
+    if (!encoding_str.empty())
     {
-        chapter_pattern.assign(encoding_str);
-    }
-    catch (const boost::regex_error& e)
-    {
-        LOG_ERROR("regular expression creation failed {} {} {}", encoding_str, detected_encoding_, e.what());
-        emit parsing_finished(0);
-        return;
-    }
+        LOG_INFO("regular expression encoding {} encoding {} {}", utf8_str, detected_encoding_, encoding_str);
 
-    std::string_view content(reinterpret_cast<const char*>(mapped_data), file_size);
-    boost::cregex_iterator begin(content.data(), content.data() + content.size(), chapter_pattern);
-    boost::cregex_iterator end;
-
-    uint32_t chapter_count = 0;
-    uint32_t chapter_parse_failed = 0;
-    uint32_t chapter_parse_success = 0;
-    for (auto it = begin; it != end; ++it)
-    {
-        chapter_count++;
-        const boost::cmatch& match = *it;
+        boost::regex chapter_pattern;
         try
         {
-            chapter_parse_success++;
-            chapter_info chapter = {match.str(), static_cast<qint64>(match.position())};
-            std::string utf8_title = boost::locale::conv::to_utf<char>(chapter.title, detected_encoding_);
-            chapter.title = utf8_title;
-            chapters_.push_back(chapter);
-            emit chapter_found(QString::fromStdString(utf8_title));
+            chapter_pattern.assign(encoding_str);
         }
-        catch (const boost::locale::conv::conversion_error&)
+        catch (const boost::regex_error& e)
         {
-            chapter_parse_failed++;
-            emit chapter_found("[标题转换失败]");
+            LOG_ERROR("regular expression creation failed {} {} {}", encoding_str, detected_encoding_, e.what());
+            emit parsing_finished(0);
+            return;
         }
+
+        std::string_view content(reinterpret_cast<const char*>(mapped_data), file_size);
+        boost::cregex_iterator begin(content.data(), content.data() + content.size(), chapter_pattern);
+        boost::cregex_iterator end;
+
+        uint32_t chapter_count = 0;
+        uint32_t chapter_parse_failed = 0;
+        uint32_t chapter_parse_success = 0;
+        for (auto it = begin; it != end; ++it)
+        {
+            chapter_count++;
+            const boost::cmatch& match = *it;
+            try
+            {
+                chapter_parse_success++;
+                chapter_info chapter = {match.str(), static_cast<qint64>(match.position())};
+                std::string utf8_title = boost::locale::conv::to_utf<char>(chapter.title, detected_encoding_, boost::locale::conv::method_type::skip);
+                chapter.title = utf8_title;
+                chapters_.push_back(chapter);
+                emit chapter_found(QString::fromStdString(utf8_title));
+            }
+            catch (const boost::locale::conv::conversion_error&)
+            {
+                chapter_parse_failed++;
+                emit chapter_found("[标题转换失败]");
+            }
+        }
+        LOG_INFO("parse chapters {} encoding {} chapters count {} failed {} success {}",
+                 file_path_.toStdString(),
+                 detected_encoding_,
+                 chapter_count,
+                 chapter_parse_failed,
+                 chapter_parse_success);
     }
-    LOG_INFO("parse chapters {} encoding {} chapters count {} failed {} success {}",
-             file_path_.toStdString(),
-             detected_encoding_,
-             chapter_count,
-             chapter_parse_failed,
-             chapter_parse_success);
+    if (chapters_.empty() && file_size > 0)
+    {
+        LOG_INFO("no chapters found treating the entire file as a single chapter");
+        QString title = QFileInfo(file_path_).fileName();
+        chapter_info full_text_chapter;
+        full_text_chapter.title = title.toStdString();
+        full_text_chapter.offset = 0;
+        chapters_.push_back(full_text_chapter);
+        emit chapter_found(title);
+    }
 
     emit parsing_finished(chapters_.size());
 }
