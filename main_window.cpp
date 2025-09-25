@@ -2,6 +2,7 @@
 #include "novel_manager.h"
 #include "novel_view.h"
 #include "splitter.h"
+#include "log.h"
 
 #include <QFileDialog>
 #include <QGraphicsDropShadowEffect>
@@ -291,12 +292,16 @@ void main_window::auto_scroll_click()
 
 void main_window::increase_auto_speed()
 {
-    speed_ = qMax(1, speed_ - 5);
+    auto speed = speed_;
+    speed_ = qMax(3, speed_ - 1);
+    LOG_INFO("speed from {} to {}", speed, speed_);
     reset_auto_scroll_speed();
 }
 void main_window::decrease_auto_speed()
 {
-    speed_ += 5;
+    auto speed = speed_;
+    speed_ += 1;
+    LOG_INFO("speed from {} to {}", speed, speed_);
     reset_auto_scroll_speed();
 }
 void main_window::reset_auto_scroll_speed()
