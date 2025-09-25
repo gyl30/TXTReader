@@ -11,7 +11,7 @@ class QListWidgetItem;
 class QTimer;
 class QAction;
 class QToolBar;
-class NovelView;
+class novel_view;
 class QThread;
 
 class main_window : public QMainWindow
@@ -67,7 +67,7 @@ class main_window : public QMainWindow
     int hue_;
     QTimer* auto_scroll_timer_;
     QListWidget* chapter_list_;
-    NovelView* novel_view_;
+    novel_view* novel_view_;
     QSplitter* splitter_;
     QToolBar* main_tool_bar_;
     QAction* open_file_action_;

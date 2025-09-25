@@ -26,7 +26,7 @@ main_window::main_window(QWidget* parent) : QMainWindow(parent)
     setup_connections();
     worker_thread_->start();
 
-    novel_view_->setFontStyle(font_size_, line_spacing_, letter_spacing_);
+    novel_view_->set_font_style(font_size_, line_spacing_, letter_spacing_);
     setStyleSheet("QSplitter, QListWidget, QToolBar, QStatusBar, QAbstractScrollArea { background-color: transparent; border: none; }");
     setWindowTitle("TXT 小说阅读器");
     resize(1024, 768);
@@ -53,7 +53,7 @@ void main_window::setup_ui()
     QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; }
     QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: transparent; }
     )");
-    novel_view_ = new NovelView(splitter_);
+    novel_view_ = new novel_view(splitter_);
     novel_view_->setFrameShape(QFrame::NoFrame);
     splitter_->addWidget(chapter_list_);
     splitter_->addWidget(novel_view_);
@@ -96,8 +96,8 @@ void main_window::setup_connections()
     connect(toggle_list_action_, &QAction::triggered, this, &main_window::toggle_chapter_list_visibility);
     connect(chapter_list_, &QListWidget::itemClicked, this, &main_window::on_chapter_list_item_clicked);
 
-    connect(novel_view_, &NovelView::needPreviousChapter, this, &main_window::load_previous_chapter);
-    connect(novel_view_, &NovelView::needNextChapter, this, &main_window::load_next_chapter);
+    connect(novel_view_, &novel_view::need_previous_chapter, this, &main_window::load_previous_chapter);
+    connect(novel_view_, &novel_view::need_next_chapter, this, &main_window::load_next_chapter);
 
     connect(novel_view_->verticalScrollBar(), &QScrollBar::valueChanged, this, &main_window::update_progress_status);
     connect(scroll_action_, &QAction::triggered, this, &main_window::auto_scroll_click);
@@ -143,7 +143,7 @@ void main_window::open_file_dialog()
     if (!file_path.isEmpty())
     {
         chapter_list_->clear();
-        novel_view_->clearContent();
+        novel_view_->clear_content();
         statusBar()->showMessage("正在解析章节...");
         emit request_load_file(file_path);
     }
@@ -182,7 +182,7 @@ void main_window::on_chapter_content_ready(int chapter_index, const QString& con
 
     if (chapter_index == initial_chapter_to_load_)
     {
-        novel_view_->appendChapterContent(chapter_index, content);
+        novel_view_->append_chapter_content(chapter_index, content);
 
         if (chapter_index + 1 < total_chapters_)
         {
@@ -190,13 +190,13 @@ void main_window::on_chapter_content_ready(int chapter_index, const QString& con
         }
         initial_chapter_to_load_ = -1;
     }
-    else if (chapter_index < novel_view_->getFirstDisplayedChapterIndex())
+    else if (chapter_index < novel_view_->first_displayed_chapter_index())
     {
-        novel_view_->prependChapterContent(chapter_index, content);
+        novel_view_->prepend_chapter_content(chapter_index, content);
     }
     else
     {
-        novel_view_->appendChapterContent(chapter_index, content);
+        novel_view_->append_chapter_content(chapter_index, content);
     }
 
     is_loading_content_ = false;    // 内容加载并显示完成后，重置标志
@@ -208,14 +208,14 @@ void main_window::load_previous_chapter()
     {
         return;
     }
-    int first_index = novel_view_->getFirstDisplayedChapterIndex();
+    int first_index = novel_view_->first_displayed_chapter_index();
     if (first_index <= 0)
     {
         return;
     }
 
     int prev_index = first_index - 1;
-    if (novel_view_->isChapterDisplayed(prev_index))
+    if (novel_view_->is_chapter_displayed(prev_index))
     {
         return;
     }
@@ -230,14 +230,14 @@ void main_window::load_next_chapter()
     {
         return;
     }
-    int last_index = novel_view_->getLastDisplayedChapterIndex();
+    int last_index = novel_view_->last_displayed_chapter_index();
     if (static_cast<size_t>(last_index) >= total_chapters_ - 1)
     {
         return;
     }
 
     int next_index = last_index + 1;
-    if (novel_view_->isChapterDisplayed(next_index))
+    if (novel_view_->is_chapter_displayed(next_index))
     {
         return;
     }
@@ -254,7 +254,7 @@ void main_window::load_chapter(int chapter_index)
     }
 
     is_loading_content_ = true;
-    novel_view_->clearContent();
+    novel_view_->clear_content();
 
     initial_chapter_to_load_ = chapter_index;
     emit request_chapter_content(chapter_index);
@@ -272,32 +272,32 @@ void main_window::update_progress_status()
 void main_window::increase_font_size()
 {
     font_size_ += 2.0;
-    novel_view_->setFontStyle(font_size_, line_spacing_, letter_spacing_);
+    novel_view_->set_font_style(font_size_, line_spacing_, letter_spacing_);
 }
 void main_window::decrease_font_size()
 {
     font_size_ -= 2.0;
-    novel_view_->setFontStyle(font_size_, line_spacing_, letter_spacing_);
+    novel_view_->set_font_style(font_size_, line_spacing_, letter_spacing_);
 }
 void main_window::increase_line_spacing()
 {
     line_spacing_ += 0.1;
-    novel_view_->setFontStyle(font_size_, line_spacing_, letter_spacing_);
+    novel_view_->set_font_style(font_size_, line_spacing_, letter_spacing_);
 }
 void main_window::decrease_line_spacing()
 {
     line_spacing_ = qMax(0.5, line_spacing_ - 0.1);
-    novel_view_->setFontStyle(font_size_, line_spacing_, letter_spacing_);
+    novel_view_->set_font_style(font_size_, line_spacing_, letter_spacing_);
 }
 void main_window::increase_letter_spacing()
 {
     letter_spacing_ += 0.5;
-    novel_view_->setFontStyle(font_size_, line_spacing_, letter_spacing_);
+    novel_view_->set_font_style(font_size_, line_spacing_, letter_spacing_);
 }
 void main_window::decrease_letter_spacing()
 {
     letter_spacing_ = qMax(0.0, letter_spacing_ - 0.5);
-    novel_view_->setFontStyle(font_size_, line_spacing_, letter_spacing_);
+    novel_view_->set_font_style(font_size_, line_spacing_, letter_spacing_);
 }
 void main_window::perform_auto_scroll()
 {

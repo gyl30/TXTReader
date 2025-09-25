@@ -1,68 +1,93 @@
 #ifndef TXTREADER_NOVEL_VIEW_H
 #define TXTREADER_NOVEL_VIEW_H
 
+#include <QAbstractScrollArea>
+#include <QApplication>
+#include <QClipboard>
 #include <QFont>
 #include <QList>
-#include <memory>
+#include <QMenu>
+#include <QMouseEvent>
 #include <QTextLayout>
-#include <QAbstractScrollArea>
+#include <memory>
 
-struct ParagraphLayout
+struct paragraph_layout
 {
     std::shared_ptr<QTextLayout> text_layout;
     qreal height = 0.0;
     qreal y = 0.0;
 };
 
-struct ChapterLayout
+struct chapter_layout
 {
     int chapter_index;
-    QList<ParagraphLayout> paragraphs;
+    QList<paragraph_layout> paragraphs;
     qreal height = 0.0;
     qreal y = 0.0;
 };
 
-class NovelView : public QAbstractScrollArea
+struct text_position
+{
+    int chapter_layout_index = -1;
+    int paragraph_index = -1;
+    int char_index = -1;
+};
+
+class novel_view : public QAbstractScrollArea
 {
     Q_OBJECT
 
    public:
-    explicit NovelView(QWidget* parent = nullptr);
+    explicit novel_view(QWidget* parent = nullptr);
 
-    void setFontStyle(qreal font_size, qreal lineSpacing, qreal letterSpacing);
-    void clearContent();
-    void prependChapterContent(int chapterIndex, const QString& content);
-    void appendChapterContent(int chapterIndex, const QString& content);
-    void relayoutAndRedraw();
+    void set_font_style(qreal font_size, qreal line_spacing, qreal letter_spacing);
+    void clear_content();
+    void prepend_chapter_content(int chapter_index, const QString& content);
+    void append_chapter_content(int chapter_index, const QString& content);
+    void relayout_and_redraw();
 
-    bool isChapterDisplayed(int chapterIndex) const;
-    int getFirstDisplayedChapterIndex() const;
-    int getLastDisplayedChapterIndex() const;
+    [[nodiscard]] bool is_chapter_displayed(int chapter_index) const;
+    [[nodiscard]] int first_displayed_chapter_index() const;
+    [[nodiscard]] int last_displayed_chapter_index() const;
 
    signals:
-    void needPreviousChapter(int currentFirstIndex);
-    void needNextChapter(int currentLastIndex);
+    void need_previous_chapter(int current_first_index);
+    void need_next_chapter(int current_last_index);
+
+   public slots:
+    void copy_selection();
 
    protected:
     void paintEvent(QPaintEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
+    void mousePressEvent(QMouseEvent* event) override;
+    void mouseMoveEvent(QMouseEvent* event) override;
+    void mouseReleaseEvent(QMouseEvent* event) override;
+    void contextMenuEvent(QContextMenuEvent* event) override;
 
    private:
-    void layoutChapter(ChapterLayout& chapter, const QString& content);
-    void relayoutAllChapters();
-    void updateScrollbar();
+    void layout_chapter(chapter_layout& chapter, const QString& content);
+    void relayout_all_chapters();
+    void update_scrollbar();
+    [[nodiscard]] text_position map_point_to_text_position(const QPoint& point) const;
+    [[nodiscard]] QString selected_text() const;
+    void clear_selection();
 
    private slots:
-    void onScrollValueChanged(int value);
+    void on_scroll_value_changed(int value);
 
    private:
-    QList<ChapterLayout> chapterLayouts_;
-    qreal totalHeight_ = 0.0;
+    QList<chapter_layout> chapter_layouts_;
+    qreal total_height_ = 0.0;
 
     QFont font_;
-    qreal lineSpacing_ = 1.5;
-    qreal letterSpacing_ = 1.5;
-    qreal paragraphSpacing_ = 10.0;
+    qreal line_spacing_ = 1.5;
+    qreal letter_spacing_ = 1.5;
+    qreal paragraph_spacing_ = 10.0;
+
+    bool is_selecting_ = false;
+    text_position selection_start_;
+    text_position selection_end_;
 };
 
-#endif
+#endif    // TXTREADER_NOVEL_VIEW_H
