@@ -120,10 +120,15 @@ void main_window::paintEvent(QPaintEvent* event)
     {
         QPainter painter(this);
         QRect r = rect();
+
+        QColor color1 = QColor::fromHsv(hue_ % 360, 80, 235);
+        QColor color2 = QColor::fromHsv((hue_ + 40) % 360, 80, 235);
+        QColor color3 = QColor::fromHsv((hue_ + 80) % 360, 80, 235);
         QLinearGradient gradient(0, -gradient_offset_, 0, r.height() - gradient_offset_);
-        gradient.setColorAt(0.0, QColor::fromHsv(hue_ % 360, 150, 200));
-        gradient.setColorAt(0.5, QColor::fromHsv((hue_ + 120) % 360, 150, 200));
-        gradient.setColorAt(1.0, QColor::fromHsv((hue_ + 240) % 360, 150, 200));
+
+        gradient.setColorAt(0.0, color1);
+        gradient.setColorAt(0.5, color2);
+        gradient.setColorAt(1.0, color3);
         painter.fillRect(r, gradient);
     }
     else
@@ -337,7 +342,13 @@ void main_window::reset_auto_scroll_speed()
 void main_window::update_background_gradient()
 {
     gradient_offset_ = (gradient_offset_ + 1) % height();
-    hue_ = (hue_ + 1) % 360;
+    static double hue_f = hue_;
+    hue_f += 0.25;
+    if (hue_f >= 360.0)
+    {
+        hue_f -= 360.0;
+    }
+    hue_ = static_cast<int>(hue_f);
     update();
 }
 void main_window::on_color_action()
