@@ -1,8 +1,7 @@
+#include <utility>
 #include <QPainter>
 #include <QScrollBar>
 #include <QTextOption>
-#include <QDebug>
-#include <utility>
 #include "novel_view.h"
 
 NovelView::NovelView(QWidget* parent) : QAbstractScrollArea(parent)
@@ -46,9 +45,9 @@ void NovelView::prependChapterContent(int chapterIndex, const QString& content)
     viewport()->setUpdatesEnabled(false);
     int oldScrollValue = verticalScrollBar()->value();
 
-    for (int i = 0; i < chapterLayouts_.size(); ++i)
+    for (auto& chapterLayout : chapterLayouts_)
     {
-        chapterLayouts_[i].y += newHeight;
+        chapterLayout.y += newHeight;
     }
     totalHeight_ += newHeight;
 
@@ -90,13 +89,9 @@ void NovelView::relayoutAndRedraw()
 
 bool NovelView::isChapterDisplayed(int chapterIndex) const
 {
-    for (const auto& layout : chapterLayouts_)
-    {
-        if (layout.chapter_index == chapterIndex)
-        {
-            return true;
-        }
-    }
+    return std::find_if(chapterLayouts_.begin(),
+                        chapterLayouts_.end(),
+                        [chapterIndex](const ChapterLayout& layout) { return layout.chapter_index == chapterIndex; }) != chapterLayouts_.end();
     return false;
 }
 
@@ -212,10 +207,10 @@ void NovelView::relayoutAllChapters()
     }
 
     totalHeight_ = 0;
-    for (int i = 0; i < chapterLayouts_.size(); ++i)
+    for (auto& chapterLayout : chapterLayouts_)
     {
         qreal chapterCurrentHeight = 0;
-        for (auto& para : chapterLayouts_[i].paragraphs)
+        for (auto& para : chapterLayout.paragraphs)
         {
             para.text_layout->setFont(font_);
             para.text_layout->beginLayout();
@@ -236,17 +231,17 @@ void NovelView::relayoutAllChapters()
             para.y = chapterCurrentHeight;
             chapterCurrentHeight += paraHeight + paragraphSpacing_;
         }
-        if (!chapterLayouts_[i].paragraphs.isEmpty())
+        if (!chapterLayout.paragraphs.isEmpty())
         {
-            chapterLayouts_[i].height = chapterCurrentHeight - paragraphSpacing_;
+            chapterLayout.height = chapterCurrentHeight - paragraphSpacing_;
         }
         else
         {
-            chapterLayouts_[i].height = 0;
+            chapterLayout.height = 0;
         }
 
-        chapterLayouts_[i].y = totalHeight_;
-        totalHeight_ += chapterLayouts_[i].height;
+        chapterLayout.y = totalHeight_;
+        totalHeight_ += chapterLayout.height;
     }
 
     updateScrollbar();

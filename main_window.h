@@ -12,6 +12,7 @@ class QTimer;
 class QAction;
 class QToolBar;
 class NovelView;
+class QThread;
 
 class main_window : public QMainWindow
 {
@@ -19,10 +20,14 @@ class main_window : public QMainWindow
 
    public:
     explicit main_window(QWidget* parent = nullptr);
-    ~main_window();
+    ~main_window() override;
 
    protected:
     void paintEvent(QPaintEvent* event) override;
+
+   signals:
+    void request_load_file(const QString& file_path);
+    void request_chapter_content(int chapter_index);
 
    private slots:
     void open_file_dialog();
@@ -31,9 +36,9 @@ class main_window : public QMainWindow
 
     void on_chapter_found(const QString& title);
     void on_parsing_finished(size_t total_chapters);
-
-    void load_previous_chapter(int currentFirstIndex);
-    void load_next_chapter(int currentLastIndex);
+    void on_chapter_content_ready(int chapter_index, const QString& content);
+    void load_previous_chapter();
+    void load_next_chapter();
 
     void update_progress_status();
     void perform_auto_scroll();
@@ -52,7 +57,7 @@ class main_window : public QMainWindow
    private:
     void setup_ui();
     void setup_connections();
-    void load_chapter(int chapterIndex);
+    void load_chapter(int chapter_index);
     void reset_auto_scroll_speed();
 
    private:
@@ -65,7 +70,6 @@ class main_window : public QMainWindow
     NovelView* novel_view_;
     QSplitter* splitter_;
     QToolBar* main_tool_bar_;
-
     QAction* open_file_action_;
     QAction* color_action_;
     QAction* toggle_list_action_;
@@ -78,15 +82,16 @@ class main_window : public QMainWindow
     QAction* del_line_spacing_action_;
     QAction* add_letter_spacing_action_;
     QAction* del_letter_spacing_action_;
-
     bool auto_scroll_ = false;
     int speed_ = 30;
     qreal font_size_ = 38.0;
     qreal line_spacing_ = 1.5;
     qreal letter_spacing_ = 1.5;
-
     novel_manager* novel_manager_;
+    QThread* worker_thread_;
+    size_t total_chapters_ = 0;
     bool is_loading_content_ = false;
+    int initial_chapter_to_load_ = -1;
 };
 
-#endif
+#endif    // TXTREADER_MAIN_WINDOW_H

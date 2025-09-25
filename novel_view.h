@@ -1,11 +1,11 @@
 #ifndef TXTREADER_NOVEL_VIEW_H
 #define TXTREADER_NOVEL_VIEW_H
 
-#include <QAbstractScrollArea>
 #include <QFont>
 #include <QList>
-#include <QTextLayout>
 #include <memory>
+#include <QTextLayout>
+#include <QAbstractScrollArea>
 
 struct ParagraphLayout
 {

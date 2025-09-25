@@ -1,11 +1,10 @@
-#ifndef NOVEL_MANAGER_H
-#define NOVEL_MANAGER_H
+#ifndef TXTREADER_NOVEL_MANAGER_H
+#define TXTREADER_NOVEL_MANAGER_H
 
 #include <QObject>
 #include <QString>
 #include <vector>
 #include <string>
-class QThread;
 
 struct chapter_info
 {
@@ -21,22 +20,21 @@ class novel_manager : public QObject
     explicit novel_manager(QObject* parent = nullptr);
     ~novel_manager() override;
 
-    void load_file(const QString& file_path);
-    QString get_chapter_content(size_t chapter_index);
-    [[nodiscard]] size_t get_total_chapters() const { return chapters_.size(); }
-
    signals:
     void chapter_found(const QString& title);
     void parsing_finished(size_t total_chapters);
+    void chapter_content_ready(int chapter_index, const QString& content);
 
-   private slots:
+   public slots:
+    void load_file(const QString& file_path);
+    void fetch_chapter_content(int chapter_index);
+
+   private:
     void parse_chapters_async();
 
    private:
-    QThread* worker_thread_;
     QString file_path_;
     std::vector<chapter_info> chapters_;
-    std::string content_;
     std::string detected_encoding_;
 };
 

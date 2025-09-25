@@ -1,6 +1,4 @@
-#include <QDebug>
 #include <QFile>
-#include <QThread>
 #include <boost/locale.hpp>
 #include <boost/regex.hpp>
 #include <uchardet/uchardet.h>
@@ -41,26 +39,20 @@ static std::string detect_file_encoding(const QString& file_path)
     return "";
 }
 
-novel_manager::novel_manager(QObject* parent) : QObject(parent), worker_thread_(new QThread(this))
+novel_manager::novel_manager(QObject* parent) : QObject(parent)
 {
     boost::locale::generator gen;
     std::locale::global(gen(""));
-    this->moveToThread(worker_thread_);
-    worker_thread_->start();
 }
 
-novel_manager::~novel_manager()
-{
-    worker_thread_->quit();
-    worker_thread_->wait();
-}
+novel_manager::~novel_manager() { LOG_INFO("novel_manager destroyed"); }
 
 void novel_manager::load_file(const QString& file_path)
 {
     file_path_ = file_path;
     chapters_.clear();
     detected_encoding_ = detect_file_encoding(file_path);
-    QMetaObject::invokeMethod(this, "parse_chapters_async", Qt::QueuedConnection);
+    parse_chapters_async();
 }
 
 void novel_manager::parse_chapters_async()
@@ -72,7 +64,6 @@ void novel_manager::parse_chapters_async()
         return;
     }
     LOG_INFO("parse chapters {} encoding {}", file_path_.toStdString(), detected_encoding_.c_str());
-    ;
 
     QFile file(file_path_);
     if (!file.open(QIODevice::ReadOnly))
@@ -161,47 +152,54 @@ void novel_manager::parse_chapters_async()
     emit parsing_finished(chapters_.size());
 }
 
-QString novel_manager::get_chapter_content(size_t chapter_index)
+void novel_manager::fetch_chapter_content(int chapter_index)
 {
-    if (chapter_index >= chapters_.size() || file_path_.isEmpty())
+    if (static_cast<size_t>(chapter_index) >= chapters_.size() || file_path_.isEmpty())
     {
-        return {};
+        emit chapter_content_ready(chapter_index, {});
+        return;
     }
 
     QFile file(file_path_);
     if (!file.open(QIODevice::ReadOnly))
     {
         LOG_ERROR("get chapter content open file failed {}", file_path_.toStdString());
-        return "[无法打开文件]";
+        emit chapter_content_ready(chapter_index, "[无法打开文件]");
+        return;
     }
     DEFER(file.close());
 
     const auto& current_chapter = chapters_[chapter_index];
     qint64 start_pos = current_chapter.offset;
     qint64 end_pos = file.size();
-    if (chapter_index + 1 < chapters_.size())
+    if (static_cast<size_t>(chapter_index) + 1 < chapters_.size())
     {
         end_pos = chapters_[chapter_index + 1].offset;
     }
     qint64 length = end_pos - start_pos;
-    LOG_INFO("chapter index {} title {} start pos {} end pos {} size {}", chapter_index, current_chapter.title, start_pos, end_pos, length);
+
+    LOG_INFO("Fetching chapter index {} title {} start pos {} end pos {} size {}", chapter_index, current_chapter.title, start_pos, end_pos, length);
+
     if (length <= 0)
     {
-        return {};
+        emit chapter_content_ready(chapter_index, {});
+        return;
     }
 
     file.seek(start_pos);
     QByteArray chapter_data = file.read(length);
+    QString content;
     try
     {
         std::string raw_bytes(chapter_data.constData(), chapter_data.size());
         std::string utf8_content = boost::locale::conv::to_utf<char>(raw_bytes, detected_encoding_);
-        return QString::fromStdString(utf8_content);
+        content = QString::fromStdString(utf8_content);
     }
     catch (const boost::locale::conv::conversion_error& e)
     {
         LOG_ERROR("chapter content encoding conversion failed encoding {} {}", detected_encoding_, e.what());
-        return "[内容转换失败]";
+        content = "[内容转换失败]";
     }
-    return {};
+
+    emit chapter_content_ready(chapter_index, content);
 }

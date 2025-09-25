@@ -1,9 +1,3 @@
-#include "main_window.h"
-#include "novel_manager.h"
-#include "novel_view.h"
-#include "splitter.h"
-#include "log.h"
-
 #include <QFileDialog>
 #include <QGraphicsDropShadowEffect>
 #include <QHBoxLayout>
@@ -16,18 +10,33 @@
 #include <QStatusBar>
 #include <QTimer>
 #include <QToolBar>
+#include <QThread>
+#include "log.h"
+#include "splitter.h"
+#include "novel_view.h"
+#include "main_window.h"
+#include "novel_manager.h"
 
-main_window::main_window(QWidget* parent) : QMainWindow(parent), novel_manager_(new novel_manager(this))
+main_window::main_window(QWidget* parent) : QMainWindow(parent)
 {
+    worker_thread_ = new QThread(this);
+    novel_manager_ = new novel_manager();
+    novel_manager_->moveToThread(worker_thread_);
     setup_ui();
     setup_connections();
+    worker_thread_->start();
+
     novel_view_->setFontStyle(font_size_, line_spacing_, letter_spacing_);
     setStyleSheet("QSplitter, QListWidget, QToolBar, QStatusBar, QAbstractScrollArea { background-color: transparent; border: none; }");
     setWindowTitle("TXT 小说阅读器");
     resize(1024, 768);
 }
 
-main_window::~main_window() = default;
+main_window::~main_window()
+{
+    worker_thread_->quit();
+    worker_thread_->wait();
+}
 
 void main_window::setup_ui()
 {
@@ -74,28 +83,33 @@ void main_window::setup_ui()
 
 void main_window::setup_connections()
 {
+    connect(this, &main_window::request_load_file, novel_manager_, &novel_manager::load_file);
+    connect(this, &main_window::request_chapter_content, novel_manager_, &novel_manager::fetch_chapter_content);
+
+    connect(novel_manager_, &novel_manager::chapter_found, this, &main_window::on_chapter_found);
+    connect(novel_manager_, &novel_manager::parsing_finished, this, &main_window::on_parsing_finished);
+    connect(novel_manager_, &novel_manager::chapter_content_ready, this, &main_window::on_chapter_content_ready);
+
+    connect(worker_thread_, &QThread::finished, novel_manager_, &QObject::deleteLater);
+
     connect(open_file_action_, &QAction::triggered, this, &main_window::open_file_dialog);
     connect(toggle_list_action_, &QAction::triggered, this, &main_window::toggle_chapter_list_visibility);
     connect(chapter_list_, &QListWidget::itemClicked, this, &main_window::on_chapter_list_item_clicked);
-    connect(novel_manager_, &novel_manager::chapter_found, this, &main_window::on_chapter_found);
-    connect(novel_manager_, &novel_manager::parsing_finished, this, &main_window::on_parsing_finished);
 
     connect(novel_view_, &NovelView::needPreviousChapter, this, &main_window::load_previous_chapter);
     connect(novel_view_, &NovelView::needNextChapter, this, &main_window::load_next_chapter);
-    connect(novel_view_->verticalScrollBar(), &QScrollBar::valueChanged, this, &main_window::update_progress_status);
 
+    connect(novel_view_->verticalScrollBar(), &QScrollBar::valueChanged, this, &main_window::update_progress_status);
     connect(scroll_action_, &QAction::triggered, this, &main_window::auto_scroll_click);
     connect(auto_scroll_timer_, &QTimer::timeout, this, &main_window::perform_auto_scroll);
     connect(add_speed_, &QAction::triggered, this, &main_window::increase_auto_speed);
     connect(del_speed_, &QAction::triggered, this, &main_window::decrease_auto_speed);
-
     connect(add_font_action_, &QAction::triggered, this, &main_window::increase_font_size);
     connect(del_font_action_, &QAction::triggered, this, &main_window::decrease_font_size);
     connect(add_line_spacing_action_, &QAction::triggered, this, &main_window::increase_line_spacing);
     connect(del_line_spacing_action_, &QAction::triggered, this, &main_window::decrease_line_spacing);
     connect(add_letter_spacing_action_, &QAction::triggered, this, &main_window::increase_letter_spacing);
     connect(del_letter_spacing_action_, &QAction::triggered, this, &main_window::decrease_letter_spacing);
-
     connect(background_animation_timer_, &QTimer::timeout, this, &main_window::update_background_gradient);
     connect(color_action_, &QAction::triggered, this, &main_window::on_color_action);
 }
@@ -126,7 +140,7 @@ void main_window::open_file_dialog()
         chapter_list_->clear();
         novel_view_->clearContent();
         statusBar()->showMessage("正在解析章节...");
-        novel_manager_->load_file(file_path);
+        emit request_load_file(file_path);
     }
 }
 
@@ -137,7 +151,6 @@ void main_window::on_chapter_list_item_clicked(QListWidgetItem* item)
     int index = chapter_list_->row(item);
     if (index >= 0)
     {
-        novel_view_->clearContent();
         load_chapter(index);
     }
 }
@@ -146,84 +159,100 @@ void main_window::on_chapter_found(const QString& title) { chapter_list_->addIte
 
 void main_window::on_parsing_finished(size_t total_chapters)
 {
-    statusBar()->showMessage(QString("找到 %1 个章节。").arg(total_chapters));
-    if (total_chapters > 0)
+    total_chapters_ = total_chapters;
+    statusBar()->showMessage(QString("找到 %1 个章节。").arg(total_chapters_));
+    if (total_chapters_ > 0)
     {
         load_chapter(0);
     }
 }
 
-void main_window::load_previous_chapter(int currentFirstIndex)
+void main_window::on_chapter_content_ready(int chapter_index, const QString& content)
 {
-    if (is_loading_content_ || currentFirstIndex <= 0)
+    if (content.isEmpty())
     {
+        is_loading_content_ = false;
         return;
     }
 
-    int prevIndex = currentFirstIndex - 1;
-    if (novel_view_->isChapterDisplayed(prevIndex))
+    if (chapter_index == initial_chapter_to_load_)
     {
-        return;
+        novel_view_->appendChapterContent(chapter_index, content);
+
+        if (chapter_index + 1 < total_chapters_)
+        {
+            emit request_chapter_content(chapter_index + 1);
+        }
+        initial_chapter_to_load_ = -1;
+    }
+    else if (chapter_index < novel_view_->getFirstDisplayedChapterIndex())
+    {
+        novel_view_->prependChapterContent(chapter_index, content);
+    }
+    else
+    {
+        novel_view_->appendChapterContent(chapter_index, content);
     }
 
-    is_loading_content_ = true;
-    QString content = novel_manager_->get_chapter_content(prevIndex);
-    if (!content.isEmpty())
-    {
-        novel_view_->prependChapterContent(prevIndex, content);
-    }
-    is_loading_content_ = false;
+    is_loading_content_ = false;    // 内容加载并显示完成后，重置标志
 }
 
-void main_window::load_next_chapter(int currentLastIndex)
+void main_window::load_previous_chapter()
 {
-    if (is_loading_content_ || static_cast<size_t>(currentLastIndex) >= novel_manager_->get_total_chapters() - 1)
+    if (is_loading_content_)
+    {
+        return;
+    }
+    int first_index = novel_view_->getFirstDisplayedChapterIndex();
+    if (first_index <= 0)
     {
         return;
     }
 
-    int nextIndex = currentLastIndex + 1;
-    if (novel_view_->isChapterDisplayed(nextIndex))
+    int prev_index = first_index - 1;
+    if (novel_view_->isChapterDisplayed(prev_index))
     {
         return;
     }
 
     is_loading_content_ = true;
-    QString content = novel_manager_->get_chapter_content(nextIndex);
-    if (!content.isEmpty())
-    {
-        novel_view_->appendChapterContent(nextIndex, content);
-    }
-    is_loading_content_ = false;
+    emit request_chapter_content(prev_index);
 }
 
-void main_window::load_chapter(int chapterIndex)
+void main_window::load_next_chapter()
 {
-    if (is_loading_content_ || chapterIndex < 0 || static_cast<size_t>(chapterIndex) >= novel_manager_->get_total_chapters())
+    if (is_loading_content_)
+    {
+        return;
+    }
+    int last_index = novel_view_->getLastDisplayedChapterIndex();
+    if (static_cast<size_t>(last_index) >= total_chapters_ - 1)
+    {
+        return;
+    }
+
+    int next_index = last_index + 1;
+    if (novel_view_->isChapterDisplayed(next_index))
     {
         return;
     }
 
     is_loading_content_ = true;
+    emit request_chapter_content(next_index);
+}
 
+void main_window::load_chapter(int chapter_index)
+{
+    if (chapter_index < 0 || static_cast<size_t>(chapter_index) >= total_chapters_)
+    {
+        return;
+    }
+
+    is_loading_content_ = true;
     novel_view_->clearContent();
 
-    QString content = novel_manager_->get_chapter_content(chapterIndex);
-    if (!content.isEmpty())
-    {
-        novel_view_->appendChapterContent(chapterIndex, content);
-    }
-
-    if (chapterIndex + 1 < novel_manager_->get_total_chapters())
-    {
-        QString nextContent = novel_manager_->get_chapter_content(chapterIndex + 1);
-        if (!nextContent.isEmpty())
-        {
-            novel_view_->appendChapterContent(chapterIndex + 1, nextContent);
-        }
-    }
-
-    is_loading_content_ = false;
+    initial_chapter_to_load_ = chapter_index;
+    emit request_chapter_content(chapter_index);
 }
 
 void main_window::update_progress_status()
@@ -235,7 +264,6 @@ void main_window::update_progress_status()
         statusBar()->showMessage(QString("进度: %1%").arg(progress, 0, 'f', 2));
     }
 }
-
 void main_window::increase_font_size()
 {
     font_size_ += 2.0;
@@ -246,7 +274,6 @@ void main_window::decrease_font_size()
     font_size_ -= 2.0;
     novel_view_->setFontStyle(font_size_, line_spacing_, letter_spacing_);
 }
-
 void main_window::increase_line_spacing()
 {
     line_spacing_ += 0.1;
@@ -257,7 +284,6 @@ void main_window::decrease_line_spacing()
     line_spacing_ = qMax(0.5, line_spacing_ - 0.1);
     novel_view_->setFontStyle(font_size_, line_spacing_, letter_spacing_);
 }
-
 void main_window::increase_letter_spacing()
 {
     letter_spacing_ += 0.5;
@@ -268,13 +294,11 @@ void main_window::decrease_letter_spacing()
     letter_spacing_ = qMax(0.0, letter_spacing_ - 0.5);
     novel_view_->setFontStyle(font_size_, line_spacing_, letter_spacing_);
 }
-
 void main_window::perform_auto_scroll()
 {
     QScrollBar* scrollBar = novel_view_->verticalScrollBar();
     scrollBar->setValue(scrollBar->value() + 1);
 }
-
 void main_window::auto_scroll_click()
 {
     auto_scroll_ = !auto_scroll_;
@@ -289,7 +313,6 @@ void main_window::auto_scroll_click()
         scroll_action_->setText("自动滚动");
     }
 }
-
 void main_window::increase_auto_speed()
 {
     auto speed = speed_;
@@ -311,14 +334,12 @@ void main_window::reset_auto_scroll_speed()
         auto_scroll_timer_->start(speed_);
     }
 }
-
 void main_window::update_background_gradient()
 {
     gradient_offset_ = (gradient_offset_ + 1) % height();
     hue_ = (hue_ + 1) % 360;
     update();
 }
-
 void main_window::on_color_action()
 {
     is_dynamic_background_ = !is_dynamic_background_;
