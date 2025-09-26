@@ -9,6 +9,7 @@
 #include <QSplitter>
 #include <QStatusBar>
 #include <QTimer>
+#include <QElapsedTimer>
 #include <QToolBar>
 #include <QThread>
 #include "log.h"
@@ -17,12 +18,21 @@
 #include "main_window.h"
 #include "novel_manager.h"
 
+static QColor interpolate_color(const QColor& c1, const QColor& c2, qreal progress)
+{
+    qreal r = c1.redF() + ((c2.redF() - c1.redF()) * progress);
+    qreal g = c1.greenF() + ((c2.greenF() - c1.greenF()) * progress);
+    qreal b = c1.blueF() + ((c2.blueF() - c1.blueF()) * progress);
+    return QColor::fromRgbF(static_cast<float>(r), static_cast<float>(g), static_cast<float>(b));
+}
+
 main_window::main_window(QWidget* parent) : QMainWindow(parent)
 {
     worker_thread_ = new QThread(this);
     novel_manager_ = new novel_manager();
     novel_manager_->moveToThread(worker_thread_);
     setup_ui();
+    setup_color_schemes();
     setup_connections();
     worker_thread_->start();
 
@@ -36,6 +46,7 @@ main_window::~main_window()
 {
     worker_thread_->quit();
     worker_thread_->wait();
+    delete transition_start_time_;
 }
 
 void main_window::setup_ui()
@@ -71,11 +82,12 @@ void main_window::setup_ui()
     del_line_spacing_action_ = main_tool_bar_->addAction("行距-");
     add_letter_spacing_action_ = main_tool_bar_->addAction("字距+");
     del_letter_spacing_action_ = main_tool_bar_->addAction("字距-");
-    color_action_ = main_tool_bar_->addAction("动态背景");
+    color_action_ = main_tool_bar_->addAction("开启动态背景");
 
     auto_scroll_timer_ = new QTimer(this);
     background_animation_timer_ = new QTimer(this);
-    hue_ = 0;
+    color_change_timer_ = new QTimer(this);
+    transition_start_time_ = new QElapsedTimer();
 
     statusBar()->showMessage("就绪");
     statusBar()->setSizeGripEnabled(false);
@@ -110,30 +122,31 @@ void main_window::setup_connections()
     connect(del_line_spacing_action_, &QAction::triggered, this, &main_window::decrease_line_spacing);
     connect(add_letter_spacing_action_, &QAction::triggered, this, &main_window::increase_letter_spacing);
     connect(del_letter_spacing_action_, &QAction::triggered, this, &main_window::decrease_letter_spacing);
+
     connect(background_animation_timer_, &QTimer::timeout, this, &main_window::update_background_gradient);
     connect(color_action_, &QAction::triggered, this, &main_window::on_color_action);
+    connect(color_change_timer_, &QTimer::timeout, this, &main_window::change_to_next_color_scheme);
 }
 
 void main_window::paintEvent(QPaintEvent* event)
 {
+    Q_UNUSED(event);
+    QPainter painter(this);
     if (is_dynamic_background_)
     {
-        QPainter painter(this);
-        QRect r = rect();
+        constexpr int transition_duration_ms = 5000;
+        qreal progress = static_cast<qreal>(transition_start_time_->elapsed()) / transition_duration_ms;
+        progress = qMin(progress, 1.0);
 
-        QColor color1 = QColor::fromHsv(hue_ % 360, 80, 235);
-        QColor color2 = QColor::fromHsv((hue_ + 40) % 360, 80, 235);
-        QColor color3 = QColor::fromHsv((hue_ + 80) % 360, 80, 235);
-        QLinearGradient gradient(0, -gradient_offset_, 0, r.height() - gradient_offset_);
+        // 计算当前帧的单一中间色
+        QColor interpolated_color = interpolate_color(current_color_, target_color_, progress);
 
-        gradient.setColorAt(0.0, color1);
-        gradient.setColorAt(0.5, color2);
-        gradient.setColorAt(1.0, color3);
-        painter.fillRect(r, gradient);
+        // 使用这个单一颜色填充整个背景
+        painter.fillRect(rect(), interpolated_color);
     }
     else
     {
-        QMainWindow::paintEvent(event);
+        painter.fillRect(rect(), QColor("#FDF6E3"));
     }
 }
 
@@ -148,9 +161,7 @@ void main_window::open_file_dialog()
         emit request_load_file(file_path);
     }
 }
-
 void main_window::toggle_chapter_list_visibility() { chapter_list_->setVisible(!chapter_list_->isVisible()); }
-
 void main_window::on_chapter_list_item_clicked(QListWidgetItem* item)
 {
     int index = chapter_list_->row(item);
@@ -159,9 +170,7 @@ void main_window::on_chapter_list_item_clicked(QListWidgetItem* item)
         load_chapter(index);
     }
 }
-
 void main_window::on_chapter_found(const QString& title) { chapter_list_->addItem(title); }
-
 void main_window::on_parsing_finished(size_t total_chapters)
 {
     total_chapters_ = total_chapters;
@@ -171,7 +180,6 @@ void main_window::on_parsing_finished(size_t total_chapters)
         load_chapter(0);
     }
 }
-
 void main_window::on_chapter_content_ready(int chapter_index, const QString& content)
 {
     if (content.isEmpty())
@@ -179,11 +187,9 @@ void main_window::on_chapter_content_ready(int chapter_index, const QString& con
         is_loading_content_ = false;
         return;
     }
-
     if (chapter_index == initial_chapter_to_load_)
     {
         novel_view_->append_chapter_content(chapter_index, content);
-
         if (chapter_index + 1 < total_chapters_)
         {
             emit request_chapter_content(chapter_index + 1);
@@ -198,10 +204,8 @@ void main_window::on_chapter_content_ready(int chapter_index, const QString& con
     {
         novel_view_->append_chapter_content(chapter_index, content);
     }
-
-    is_loading_content_ = false;    // 内容加载并显示完成后，重置标志
+    is_loading_content_ = false;
 }
-
 void main_window::load_previous_chapter()
 {
     if (is_loading_content_)
@@ -213,17 +217,14 @@ void main_window::load_previous_chapter()
     {
         return;
     }
-
     int prev_index = first_index - 1;
     if (novel_view_->is_chapter_displayed(prev_index))
     {
         return;
     }
-
     is_loading_content_ = true;
     emit request_chapter_content(prev_index);
 }
-
 void main_window::load_next_chapter()
 {
     if (is_loading_content_)
@@ -235,31 +236,25 @@ void main_window::load_next_chapter()
     {
         return;
     }
-
     int next_index = last_index + 1;
     if (novel_view_->is_chapter_displayed(next_index))
     {
         return;
     }
-
     is_loading_content_ = true;
     emit request_chapter_content(next_index);
 }
-
 void main_window::load_chapter(int chapter_index)
 {
     if (chapter_index < 0 || static_cast<size_t>(chapter_index) >= total_chapters_)
     {
         return;
     }
-
     is_loading_content_ = true;
     novel_view_->clear_content();
-
     initial_chapter_to_load_ = chapter_index;
     emit request_chapter_content(chapter_index);
 }
-
 void main_window::update_progress_status()
 {
     QScrollBar* scrollBar = novel_view_->verticalScrollBar();
@@ -339,28 +334,60 @@ void main_window::reset_auto_scroll_speed()
         auto_scroll_timer_->start(speed_);
     }
 }
-void main_window::update_background_gradient()
+
+void main_window::setup_color_schemes()
 {
-    gradient_offset_ = (gradient_offset_ + 1) % height();
-    static double hue_f = hue_;
-    hue_f += 0.25;
-    if (hue_f >= 360.0)
+    color_schemes_.append(QColor("#E0E6F8"));
+    color_schemes_.append(QColor("#D7EEF9"));
+    color_schemes_.append(QColor("#D7F9E9"));
+    color_schemes_.append(QColor("#E3F8F1"));
+    color_schemes_.append(QColor("#F8F0D5"));
+    color_schemes_.append(QColor("#F7F3E9"));
+    color_schemes_.append(QColor("#F9DED7"));
+    color_schemes_.append(QColor("#F8E5E0"));
+    color_schemes_.append(QColor("#E2E8F0"));
+    color_schemes_.append(QColor("#EBE8F9"));
+    color_schemes_.append(QColor("#F5F5DC"));
+    if (!color_schemes_.isEmpty())
     {
-        hue_f -= 360.0;
+        current_color_ = color_schemes_.first();
+        target_color_ = color_schemes_.first();
     }
-    hue_ = static_cast<int>(hue_f);
-    update();
 }
+
+void main_window::change_to_next_color_scheme()
+{
+    if (color_schemes_.size() < 2)
+    {
+        return;
+    }
+
+    current_color_ = target_color_;
+
+    scheme_index_ = (scheme_index_ + 1) % static_cast<int>(color_schemes_.size());
+
+    target_color_ = color_schemes_[scheme_index_];
+
+    transition_start_time_->restart();
+}
+
+void main_window::update_background_gradient() { update(); }
+
 void main_window::on_color_action()
 {
     is_dynamic_background_ = !is_dynamic_background_;
-    if (is_dynamic_background_)
+    if (is_dynamic_background_ && !color_schemes_.isEmpty())
     {
+        color_action_->setText("关闭动态背景");
+        change_to_next_color_scheme();
         background_animation_timer_->start(30);
+        color_change_timer_->start(5000);
     }
     else
     {
+        color_action_->setText("开启动态背景");
         background_animation_timer_->stop();
+        color_change_timer_->stop();
         update();
     }
 }

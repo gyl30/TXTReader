@@ -3,6 +3,8 @@
 
 #include <QMainWindow>
 #include <QList>
+#include <QPair>
+#include <QColor>
 
 class QListWidget;
 class QSplitter;
@@ -10,6 +12,7 @@ class novel_manager;
 class QListWidgetItem;
 class QTimer;
 class QAction;
+class QElapsedTimer;
 class QToolBar;
 class novel_view;
 class QThread;
@@ -49,6 +52,7 @@ class main_window : public QMainWindow
     void decrease_font_size();
     void update_background_gradient();
     void on_color_action();
+    void change_to_next_color_scheme();
     void increase_line_spacing();
     void decrease_line_spacing();
     void increase_letter_spacing();
@@ -58,13 +62,19 @@ class main_window : public QMainWindow
     void setup_ui();
     void setup_connections();
     void load_chapter(int chapter_index);
+    void setup_color_schemes();
     void reset_auto_scroll_speed();
 
    private:
-    int gradient_offset_ = 0;
+    QList<QColor> color_schemes_;
+    int scheme_index_ = 0;
+    QColor current_color_;
+    QColor target_color_;
+
+    QElapsedTimer* transition_start_time_;
+    QTimer* color_change_timer_;
     bool is_dynamic_background_ = false;
     QTimer* background_animation_timer_;
-    int hue_;
     QTimer* auto_scroll_timer_;
     QListWidget* chapter_list_;
     novel_view* novel_view_;
