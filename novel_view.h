@@ -40,7 +40,7 @@ class novel_view : public QAbstractScrollArea
    public:
     explicit novel_view(QWidget* parent = nullptr);
 
-    void set_font_style(qreal font_size, qreal line_spacing, qreal letter_spacing);
+    void set_font_style(QFont font, qreal line_spacing, qreal letter_spacing);
     void clear_content();
     void prepend_chapter_content(int chapter_index, const QString& content);
     void append_chapter_content(int chapter_index, const QString& content);

@@ -3,6 +3,8 @@
 #include <QHBoxLayout>
 #include <QListWidget>
 #include <QMenuBar>
+#include <QFontDialog>
+#include <QFontDatabase>
 #include <QMessageBox>
 #include <QPainter>
 #include <QScrollBar>
@@ -26,17 +28,37 @@ static QColor interpolate_color(const QColor& c1, const QColor& c2, qreal progre
     return QColor::fromRgbF(static_cast<float>(r), static_cast<float>(g), static_cast<float>(b));
 }
 
+static QFont default_font(qreal font_size)
+{
+    const QStringList preferred_families = {"Microsoft YaHei UI", "Noto Sans CJK SC", "PingFang SC", "WenQuanYi Zen Hei"};
+
+    for (const QString& family : preferred_families)
+    {
+        if (QFontDatabase::families().contains(family, Qt::CaseInsensitive))
+        {
+            QFont font(family);
+            font.setPointSizeF(font_size);
+            return font;
+        }
+    }
+
+    QFont font("sans-serif");
+    font.setPointSizeF(font_size);
+    return font;
+}
 main_window::main_window(QWidget* parent) : QMainWindow(parent)
 {
     worker_thread_ = new QThread(this);
     novel_manager_ = new novel_manager();
     novel_manager_->moveToThread(worker_thread_);
+    view_font_ = default_font(38.0);
+    LOG_INFO("default font {}", view_font_.toString().toStdString());
     setup_ui();
     setup_color_schemes();
     setup_connections();
     worker_thread_->start();
-
-    novel_view_->set_font_style(font_size_, line_spacing_, letter_spacing_);
+    novel_view_->set_font_style(view_font_, line_spacing_, letter_spacing_);
+    apply_font_and_spacing();
     setStyleSheet("QSplitter, QListWidget, QToolBar, QStatusBar, QAbstractScrollArea { background-color: transparent; border: none; }");
     setWindowTitle("TXT 小说阅读器");
     resize(1024, 768);
@@ -73,15 +95,19 @@ void main_window::setup_ui()
     main_tool_bar_->setMovable(false);
     open_file_action_ = main_tool_bar_->addAction("打开");
     toggle_list_action_ = main_tool_bar_->addAction("目录");
+    main_tool_bar_->addSeparator();
+    select_font_action_ = main_tool_bar_->addAction("设置字体");
     add_font_action_ = main_tool_bar_->addAction("字体+");
     del_font_action_ = main_tool_bar_->addAction("字体-");
-    scroll_action_ = main_tool_bar_->addAction("自动滚动");
-    add_speed_ = main_tool_bar_->addAction("加速");
-    del_speed_ = main_tool_bar_->addAction("减速");
     add_line_spacing_action_ = main_tool_bar_->addAction("行距+");
     del_line_spacing_action_ = main_tool_bar_->addAction("行距-");
     add_letter_spacing_action_ = main_tool_bar_->addAction("字距+");
     del_letter_spacing_action_ = main_tool_bar_->addAction("字距-");
+    main_tool_bar_->addSeparator();
+    scroll_action_ = main_tool_bar_->addAction("自动滚动");
+    add_speed_ = main_tool_bar_->addAction("加速");
+    del_speed_ = main_tool_bar_->addAction("减速");
+    main_tool_bar_->addSeparator();
     color_action_ = main_tool_bar_->addAction("开启动态背景");
 
     auto_scroll_timer_ = new QTimer(this);
@@ -123,6 +149,7 @@ void main_window::setup_connections()
     connect(add_letter_spacing_action_, &QAction::triggered, this, &main_window::increase_letter_spacing);
     connect(del_letter_spacing_action_, &QAction::triggered, this, &main_window::decrease_letter_spacing);
 
+    connect(select_font_action_, &QAction::triggered, this, &main_window::select_font_dialog);
     connect(background_animation_timer_, &QTimer::timeout, this, &main_window::update_background_gradient);
     connect(color_action_, &QAction::triggered, this, &main_window::on_color_action);
     connect(color_change_timer_, &QTimer::timeout, this, &main_window::change_to_next_color_scheme);
@@ -138,10 +165,8 @@ void main_window::paintEvent(QPaintEvent* event)
         qreal progress = static_cast<qreal>(transition_start_time_->elapsed()) / transition_duration_ms;
         progress = qMin(progress, 1.0);
 
-        // 计算当前帧的单一中间色
         QColor interpolated_color = interpolate_color(current_color_, target_color_, progress);
 
-        // 使用这个单一颜色填充整个背景
         painter.fillRect(rect(), interpolated_color);
     }
     else
@@ -264,35 +289,60 @@ void main_window::update_progress_status()
         statusBar()->showMessage(QString("进度: %1%").arg(progress, 0, 'f', 2));
     }
 }
+void main_window::select_font_dialog()
+{
+    bool ok;
+    QFont font = QFontDialog::getFont(&ok, view_font_, this, "选择字体");
+    if (ok)
+    {
+        LOG_INFO("update font from {} to {}", view_font_.toString().toStdString(), font.toString().toStdString());
+        view_font_ = font;
+        apply_font_and_spacing();
+    }
+}
+
+void main_window::apply_font_and_spacing()
+{
+    QFont final_font = view_font_;
+    final_font.setLetterSpacing(QFont::AbsoluteSpacing, letter_spacing_);
+    novel_view_->set_font_style(final_font, line_spacing_, letter_spacing_);
+}
+
 void main_window::increase_font_size()
 {
-    font_size_ += 2.0;
-    novel_view_->set_font_style(font_size_, line_spacing_, letter_spacing_);
+    view_font_.setPointSizeF(view_font_.pointSizeF() + 2.0);
+    apply_font_and_spacing();
 }
+
 void main_window::decrease_font_size()
 {
-    font_size_ -= 2.0;
-    novel_view_->set_font_style(font_size_, line_spacing_, letter_spacing_);
+    qreal new_size = qMax(8.0, view_font_.pointSizeF() - 2.0);
+    view_font_.setPointSizeF(new_size);
+    apply_font_and_spacing();
 }
+
 void main_window::increase_line_spacing()
 {
     line_spacing_ += 0.1;
-    novel_view_->set_font_style(font_size_, line_spacing_, letter_spacing_);
+    apply_font_and_spacing();
 }
+
 void main_window::decrease_line_spacing()
 {
     line_spacing_ = qMax(0.5, line_spacing_ - 0.1);
-    novel_view_->set_font_style(font_size_, line_spacing_, letter_spacing_);
+    apply_font_and_spacing();
 }
+
 void main_window::increase_letter_spacing()
 {
     letter_spacing_ += 0.5;
-    novel_view_->set_font_style(font_size_, line_spacing_, letter_spacing_);
+    apply_font_and_spacing();
 }
+
 void main_window::decrease_letter_spacing()
 {
     letter_spacing_ = qMax(0.0, letter_spacing_ - 0.5);
-    novel_view_->set_font_style(font_size_, line_spacing_, letter_spacing_);
+    apply_font_and_spacing();
 }
 void main_window::perform_auto_scroll()
 {

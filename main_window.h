@@ -4,6 +4,7 @@
 #include <QMainWindow>
 #include <QList>
 #include <QPair>
+#include <QFont>
 #include <QColor>
 
 class QListWidget;
@@ -36,6 +37,7 @@ class main_window : public QMainWindow
     void open_file_dialog();
     void toggle_chapter_list_visibility();
     void on_chapter_list_item_clicked(QListWidgetItem* item);
+    void select_font_dialog();
 
     void on_chapter_found(const QString& title);
     void on_parsing_finished(size_t total_chapters);
@@ -64,6 +66,7 @@ class main_window : public QMainWindow
     void load_chapter(int chapter_index);
     void setup_color_schemes();
     void reset_auto_scroll_speed();
+    void apply_font_and_spacing();
 
    private:
     QList<QColor> color_schemes_;
@@ -92,9 +95,10 @@ class main_window : public QMainWindow
     QAction* del_line_spacing_action_;
     QAction* add_letter_spacing_action_;
     QAction* del_letter_spacing_action_;
+    QAction* select_font_action_;
     bool auto_scroll_ = false;
     int speed_ = 60;
-    qreal font_size_ = 38.0;
+    QFont view_font_;
     qreal line_spacing_ = 1.5;
     qreal letter_spacing_ = 1.5;
     novel_manager* novel_manager_;

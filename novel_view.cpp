@@ -35,13 +35,13 @@ novel_view::novel_view(QWidget* parent) : QAbstractScrollArea(parent)
     horizontalScrollBar()->setVisible(false);
 }
 
-void novel_view::set_font_style(qreal font_size, qreal line_spacing, qreal letter_spacing)
+void novel_view::set_font_style(QFont font, qreal line_spacing, qreal letter_spacing)
 {
-    font_.setPointSizeF(font_size);
+    font_ = std::move(font);
     font_.setLetterSpacing(QFont::AbsoluteSpacing, letter_spacing);
     line_spacing_ = line_spacing;
     letter_spacing_ = letter_spacing;
-    paragraph_spacing_ = font_size;
+    paragraph_spacing_ = font_.pointSizeF();
     relayout_and_redraw();
 }
 
