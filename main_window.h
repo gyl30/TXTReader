@@ -93,7 +93,7 @@ class main_window : public QMainWindow
     QAction* add_letter_spacing_action_;
     QAction* del_letter_spacing_action_;
     bool auto_scroll_ = false;
-    int speed_ = 30;
+    int speed_ = 60;
     qreal font_size_ = 38.0;
     qreal line_spacing_ = 1.5;
     qreal letter_spacing_ = 1.5;

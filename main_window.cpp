@@ -297,7 +297,18 @@ void main_window::decrease_letter_spacing()
 void main_window::perform_auto_scroll()
 {
     QScrollBar* scrollBar = novel_view_->verticalScrollBar();
-    scrollBar->setValue(scrollBar->value() + 1);
+    int currentValue = scrollBar->value();
+
+    if (currentValue >= scrollBar->maximum())
+    {
+        auto_scroll_click();
+        return;
+    }
+    novel_view_->viewport()->scroll(0, 1);
+
+    bool oldState = scrollBar->blockSignals(true);
+    scrollBar->setValue(currentValue + 1);
+    scrollBar->blockSignals(oldState);
 }
 void main_window::auto_scroll_click()
 {
@@ -380,7 +391,7 @@ void main_window::on_color_action()
     {
         color_action_->setText("关闭动态背景");
         change_to_next_color_scheme();
-        background_animation_timer_->start(30);
+        background_animation_timer_->start(1200);
         color_change_timer_->start(5000);
     }
     else

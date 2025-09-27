@@ -16,7 +16,7 @@ AnimatedSplitterHandle::AnimatedSplitterHandle(Qt::Orientation orientation, QSpl
                 }
                 update();
             });
-    timer_->start(30);
+    timer_->start(300);
 }
 
 void AnimatedSplitterHandle::paintEvent(QPaintEvent* /*event*/)
