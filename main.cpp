@@ -29,6 +29,14 @@ int main(int argc, char *argv[])
     init_log(app_name + ".log");
     DEFER(shutdown_log());
     QApplication a(argc, argv);
+    QFont font;
+    QStringList families;
+    families << "Microsoft YaHei UI"
+             << "Noto Sans CJK SC"
+             << "PingFang SC"
+             << "sans-serif";
+    font.setFamilies(families);
+    QApplication::setFont(font);
     main_window w;
     QApplication::setWindowIcon(emoji_to_icon("📖", 64));
     w.show();
