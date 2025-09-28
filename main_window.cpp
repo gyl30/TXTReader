@@ -257,6 +257,7 @@ void main_window::load_next_chapter()
         return;
     }
     int last_index = novel_view_->last_displayed_chapter_index();
+    LOG_INFO("total_chapters {} load next index {}", total_chapters_, last_index + 1);
     if (static_cast<size_t>(last_index) >= total_chapters_ - 1)
     {
         return;
@@ -354,11 +355,8 @@ void main_window::perform_auto_scroll()
         auto_scroll_click();
         return;
     }
-    novel_view_->viewport()->scroll(0, 1);
 
-    bool oldState = scrollBar->blockSignals(true);
     scrollBar->setValue(currentValue + 1);
-    scrollBar->blockSignals(oldState);
 }
 void main_window::auto_scroll_click()
 {

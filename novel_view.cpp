@@ -2,6 +2,7 @@
 #include <QScrollBar>
 #include <QTextOption>
 #include <utility>
+#include "log.h"
 #include "novel_view.h"
 
 static inline bool selection_is_valid(const text_position& pos) { return pos.chapter_layout_index != -1; }
@@ -367,9 +368,17 @@ void novel_view::on_scroll_value_changed(int value)
             emit need_previous_chapter(chapter_layouts_.first().chapter_index);
         }
     }
+    auto scroll_max = verticalScrollBar()->maximum();
+    auto diff = scroll_max - threshold;
 
-    if (value > verticalScrollBar()->maximum() - threshold)
+    if (value > diff)
     {
+        LOG_INFO("scroll value {} max {} threshold {} diff {} current index {}",
+                 value,
+                 scroll_max,
+                 threshold,
+                 diff,
+                 chapter_layouts_.last().chapter_index);
         if (!chapter_layouts_.isEmpty())
         {
             emit need_next_chapter(chapter_layouts_.last().chapter_index);
