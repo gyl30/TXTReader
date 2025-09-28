@@ -131,8 +131,11 @@ void novel_view::paintEvent(QPaintEvent* event)
     const QRect& visible_rect = event->rect();
     const int scroll_y = verticalScrollBar()->value();
 
-    text_position selection_start = std::min(selection_start_, selection_end_);
-    text_position selection_end = std::max(selection_start_, selection_end_);
+    painter.setClipRect(visible_rect.adjusted(0, -20, 0, 20));
+
+    text_position selection_start_pos = std::min(selection_start_, selection_end_);
+    text_position selection_end_pos = std::max(selection_start_, selection_end_);
+    bool has_selection = selection_is_valid(selection_start_pos) && selection_is_valid(selection_end_pos) && selection_start_pos < selection_end_pos;
 
     for (int chap_idx = 0; chap_idx < chapter_layouts_.size(); ++chap_idx)
     {
@@ -158,15 +161,24 @@ void novel_view::paintEvent(QPaintEvent* event)
 
             QPointF draw_position(0, para_top_y);
 
-            QVector<QTextLayout::FormatRange> selections;
-            text_position current_para_start_pos = {chap_idx, para_idx, 0};
-            text_position current_para_end_pos = {chap_idx, para_idx, static_cast<int>(para.text_layout->text().length())};
-
-            if (selection_is_valid(selection_start) && selection_is_valid(selection_end) &&
-                !(selection_end < current_para_start_pos || selection_start > current_para_end_pos))
+            bool para_has_selection = false;
+            if (has_selection)
             {
-                int start = (selection_start > current_para_start_pos) ? selection_start.char_index : 0;
-                int end = (selection_end < current_para_end_pos) ? selection_end.char_index : static_cast<int>(para.text_layout->text().length());
+                text_position para_start_pos = {chap_idx, para_idx, 0};
+                text_position para_end_pos = {chap_idx, para_idx, static_cast<int>(para.text_layout->text().length())};
+                if (!(selection_end_pos < para_start_pos || selection_start_pos > para_end_pos))
+                {
+                    para_has_selection = true;
+                }
+            }
+
+            if (para_has_selection)
+            {
+                QVector<QTextLayout::FormatRange> selections;
+                int start = (selection_start_pos > text_position{chap_idx, para_idx, 0}) ? selection_start_pos.char_index : 0;
+                int end = (selection_end_pos < text_position{chap_idx, para_idx, static_cast<int>(para.text_layout->text().length())})
+                              ? selection_end_pos.char_index
+                              : static_cast<int>(para.text_layout->text().length());
 
                 if (start < end)
                 {
@@ -177,9 +189,66 @@ void novel_view::paintEvent(QPaintEvent* event)
                     selection_range.format.setForeground(palette().highlightedText());
                     selections.append(selection_range);
                 }
+                para.text_layout->draw(&painter, draw_position, selections);
             }
+            else
+            {
+                int line_count = para.text_layout->lineCount();
+                if (line_count == 0)
+                {
+                    continue;
+                }
 
-            para.text_layout->draw(&painter, draw_position, selections);
+                qreal para_start_y = draw_position.y();
+                int first_visible_line = 0;
+                int last_visible_line = line_count - 1;
+
+                int low = 0;
+                int high = line_count - 1;
+                while (low <= high)
+                {
+                    int mid = (low + high) / 2;
+                    const QTextLine& line = para.text_layout->lineAt(mid);
+                    qreal line_bottom = para_start_y + line.y() + line.height();
+                    if (line_bottom < visible_rect.top())
+                    {
+                        low = mid + 1;
+                    }
+                    else
+                    {
+                        high = mid - 1;
+                    }
+                }
+                first_visible_line = low;
+
+                low = 0;
+                high = line_count - 1;
+                while (low <= high)
+                {
+                    int mid = (low + high) / 2;
+                    const QTextLine& line = para.text_layout->lineAt(mid);
+                    qreal line_top = para_start_y + line.y();
+                    if (line_top > visible_rect.bottom())
+                    {
+                        high = mid - 1;
+                    }
+                    else
+                    {
+                        low = mid + 1;
+                    }
+                }
+                last_visible_line = high;
+
+                for (int i = first_visible_line; i <= last_visible_line; ++i)
+                {
+                    if (i < 0 || i >= line_count)
+                    {
+                        continue;
+                    }
+                    const QTextLine& line = para.text_layout->lineAt(i);
+                    line.draw(&painter, draw_position);
+                }
+            }
         }
     }
 }
@@ -291,7 +360,7 @@ void novel_view::layout_chapter(chapter_layout& chapter, const QString& content)
 
     if (!paragraphs_text.isEmpty())
     {
-        chapter.height = chapter_current_height - paragraph_spacing_ + paragraph_spacing_;    // Keep spacing at end of chapter
+        chapter.height = chapter_current_height - paragraph_spacing_ + paragraph_spacing_;
     }
     else
     {
@@ -334,7 +403,7 @@ void novel_view::relayout_all_chapters()
         }
         if (!chapter_layout.paragraphs.isEmpty())
         {
-            chapter_layout.height = chapter_current_height;    // Keep spacing at end of chapter
+            chapter_layout.height = chapter_current_height;
         }
         else
         {
@@ -373,14 +442,15 @@ void novel_view::on_scroll_value_changed(int value)
 
     if (value > diff)
     {
-        LOG_INFO("scroll value {} max {} threshold {} diff {} current index {}",
-                 value,
-                 scroll_max,
-                 threshold,
-                 diff,
-                 chapter_layouts_.last().chapter_index);
         if (!chapter_layouts_.isEmpty())
         {
+            LOG_INFO("scroll value {} max {} threshold {} diff {} current index {}",
+                     value,
+                     scroll_max,
+                     threshold,
+                     diff,
+                     chapter_layouts_.last().chapter_index);
+
             emit need_next_chapter(chapter_layouts_.last().chapter_index);
         }
     }
