@@ -68,6 +68,9 @@ class main_window : public QMainWindow
     void reset_auto_scroll_speed();
     void apply_font_and_spacing();
 
+    void save_progress();
+    void load_progress(const QString& file_path);
+
    private:
     QList<QColor> color_schemes_;
     int scheme_index_ = 0;
@@ -104,6 +107,9 @@ class main_window : public QMainWindow
     novel_manager* novel_manager_;
     QThread* worker_thread_;
     size_t total_chapters_ = 0;
+    double scroll_ratio_to_restore_ = 0.0;
+    int chapter_index_to_restore_ = -1;
+
     bool is_loading_content_ = false;
     int initial_chapter_to_load_ = -1;
 };

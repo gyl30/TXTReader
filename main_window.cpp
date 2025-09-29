@@ -2,6 +2,7 @@
 #include <QGraphicsDropShadowEffect>
 #include <QHBoxLayout>
 #include <QListWidget>
+#include <QSettings>
 #include <QMenuBar>
 #include <QFontDialog>
 #include <QFontDatabase>
@@ -66,6 +67,7 @@ main_window::main_window(QWidget* parent) : QMainWindow(parent)
 
 main_window::~main_window()
 {
+    save_progress();
     worker_thread_->quit();
     worker_thread_->wait();
     delete transition_start_time_;
@@ -180,6 +182,7 @@ void main_window::open_file_dialog()
     QString file_path = QFileDialog::getOpenFileName(this, "打开小说", "", "Text Files (*.txt)");
     if (!file_path.isEmpty())
     {
+        save_progress();
         chapter_list_->clear();
         novel_view_->clear_content();
         statusBar()->showMessage("正在解析章节...");
@@ -200,7 +203,12 @@ void main_window::on_parsing_finished(size_t total_chapters)
 {
     total_chapters_ = total_chapters;
     statusBar()->showMessage(QString("找到 %1 个章节。").arg(total_chapters_));
-    if (total_chapters_ > 0)
+    QString current_file_path = novel_manager_->property("current_file_path").toString();
+    if (!current_file_path.isEmpty())
+    {
+        load_progress(current_file_path);
+    }
+    else if (total_chapters_ > 0)
     {
         load_chapter(0);
     }
@@ -230,6 +238,19 @@ void main_window::on_chapter_content_ready(int chapter_index, const QString& con
         novel_view_->append_chapter_content(chapter_index, content);
     }
     is_loading_content_ = false;
+    if (chapter_index == chapter_index_to_restore_)
+    {
+        QTimer::singleShot(0,
+                           this,
+                           [this]()
+                           {
+                               QScrollBar* scroll_bar = novel_view_->verticalScrollBar();
+                               int new_value = static_cast<int>(scroll_bar->maximum() * scroll_ratio_to_restore_);
+                               scroll_bar->setValue(new_value);
+                               chapter_index_to_restore_ = -1;
+                               scroll_ratio_to_restore_ = 0.0;
+                           });
+    }
 }
 void main_window::load_previous_chapter()
 {
@@ -448,5 +469,71 @@ void main_window::on_color_action()
         background_animation_timer_->stop();
         color_change_timer_->stop();
         update();
+    }
+}
+void main_window::save_progress()
+{
+    QString current_file_path = novel_manager_->property("current_file_path").toString();
+    if (current_file_path.isEmpty() || total_chapters_ == 0)
+    {
+        return;
+    }
+
+    QPair<int, double> progress = novel_view_->current_progress();
+    int chapter_index = progress.first;
+    double scroll_ratio = progress.second;
+
+    if (chapter_index < 0)
+    {
+        return;
+    }
+
+    QSettings settings("TXTReader", "TXTReader");
+    QString absolute_path = QFileInfo(current_file_path).absoluteFilePath();
+    QByteArray key = absolute_path.toUtf8().toBase64();
+    settings.beginGroup(QString(key));
+    settings.setValue("last_chapter_index", chapter_index);
+    settings.setValue("last_scroll_ratio", scroll_ratio);
+    settings.endGroup();
+    auto setting_list = settings.childGroups();
+    for (const auto& it : setting_list)
+    {
+        LOG_INFO("save progress {}", it.toStdString());
+    }
+
+    LOG_INFO("saved progress {} chapter {} ratio {}", key.toStdString(), chapter_index, scroll_ratio);
+}
+
+void main_window::load_progress(const QString& file_path)
+{
+    QSettings settings("TXTReader", "TXTReader");
+    QString absolute_path = QFileInfo(file_path).absoluteFilePath();
+    QByteArray key = absolute_path.toUtf8().toBase64();
+    auto setting_list = settings.childGroups();
+    for (const auto& it : setting_list)
+    {
+        LOG_INFO("loading progress {}", it.toStdString());
+    }
+    if (setting_list.contains(QString(key)))
+    {
+        settings.beginGroup(QString(key));
+        int chapter_index = settings.value("last_chapter_index", 0).toInt();
+        double scroll_ratio = settings.value("last_scroll_ratio", 0.0).toDouble();
+        settings.endGroup();
+
+        LOG_INFO("loading progress {} chapter {} ratio {}", absolute_path.toStdString(), chapter_index, scroll_ratio);
+        if (chapter_index >= 0 && static_cast<size_t>(chapter_index) < total_chapters_)
+        {
+            chapter_index_to_restore_ = chapter_index;
+            scroll_ratio_to_restore_ = scroll_ratio;
+            load_chapter(chapter_index);
+        }
+    }
+    else
+    {
+        if (total_chapters_ > 0)
+        {
+            load_chapter(0);
+        }
     }
 }

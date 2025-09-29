@@ -123,6 +123,38 @@ int novel_view::first_displayed_chapter_index() const { return chapter_layouts_.
 
 int novel_view::last_displayed_chapter_index() const { return chapter_layouts_.isEmpty() ? -1 : chapter_layouts_.last().chapter_index; }
 
+QPair<int, double> novel_view::current_progress() const
+{
+    if (chapter_layouts_.isEmpty())
+    {
+        return qMakePair(-1, 0.0);
+    }
+
+    QPoint top_of_viewport(viewport()->width() / 2, 0);
+    text_position pos = map_point_to_text_position(top_of_viewport);
+
+    if (!selection_is_valid(pos))
+    {
+        return qMakePair(chapter_layouts_.first().chapter_index, 0.0);
+    }
+
+    const auto& chapter = chapter_layouts_[pos.chapter_layout_index];
+    int chapter_index = chapter.chapter_index;
+    qreal chapter_height = chapter.height;
+
+    qreal global_scroll_y = verticalScrollBar()->value();
+    qreal chapter_top_y = chapter.y;
+    qreal offset_in_chapter = global_scroll_y - chapter_top_y;
+
+    double ratio = 0.0;
+    if (chapter_height > 1)
+    {
+        ratio = qBound(0.0, offset_in_chapter / chapter_height, 1.0);
+    }
+
+    return qMakePair(chapter_index, ratio);
+}
+
 void novel_view::paintEvent(QPaintEvent* event)
 {
     QPainter painter(viewport());

@@ -49,7 +49,7 @@ class novel_view : public QAbstractScrollArea
     [[nodiscard]] bool is_chapter_displayed(int chapter_index) const;
     [[nodiscard]] int first_displayed_chapter_index() const;
     [[nodiscard]] int last_displayed_chapter_index() const;
-
+    [[nodiscard]] QPair<int, double> current_progress() const;
    signals:
     void need_previous_chapter(int current_first_index);
     void need_next_chapter(int current_last_index);

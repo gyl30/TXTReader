@@ -50,6 +50,7 @@ novel_manager::~novel_manager() { LOG_INFO("novel_manager destroyed"); }
 
 void novel_manager::load_file(const QString& file_path)
 {
+    setProperty("current_file_path", file_path);
     file_path_ = file_path;
     chapters_.clear();
     detected_encoding_ = detect_file_encoding(file_path);
