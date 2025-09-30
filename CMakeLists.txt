@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(TXTreader)
+project(TXTreader VERSION 0.0.1)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -60,4 +60,20 @@ if(WIN32)
     set_target_properties(TXTReader PROPERTIES WIN32_EXECUTABLE ON)
 endif()
 
-install(TARGETS TXTReader DESTINATION bin)
+include(GNUInstallDirs)
+
+install(TARGETS TXTReader DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+set(CPACK_PACKAGE_NAME txtreader)
+set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "A simple TXT novel reader")
+set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}")
+set(CPACK_PACKAGE_DESCRIPTION_FILE "${CMAKE_CURRENT_SOURCE_DIR}/description.txt")
+
+set(CPACK_DEBIAN_PACKAGE_MAINTAINER "gyl30")
+set(CPACK_DEBIAN_PACKAGE_DEPENDS "libqt6widgets6, libqt6gui6, libqt6core6")
+
+set(CPACK_RPM_PACKAGE_GROUP "gyl30")
+set(CPACK_RPM_PACKAGE_REQUIRES "qt6-qtbase, qt6-qtbase-gui")
+
+include(CPack)

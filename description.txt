@@ -1,0 +1,1 @@
+txtreader is a lightweight, cross-platform novel reader for .txt files
