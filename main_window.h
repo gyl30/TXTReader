@@ -112,6 +112,7 @@ class main_window : public QMainWindow
 
     bool is_loading_content_ = false;
     int initial_chapter_to_load_ = -1;
+    int current_chapter_index_ = -1;
 };
 
 #endif    // TXTREADER_MAIN_WINDOW_H

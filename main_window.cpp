@@ -193,7 +193,7 @@ void main_window::toggle_chapter_list_visibility() { chapter_list_->setVisible(!
 void main_window::on_chapter_list_item_clicked(QListWidgetItem* item)
 {
     int index = chapter_list_->row(item);
-    if (index >= 0)
+    if (index >= 0 && index != current_chapter_index_)
     {
         load_chapter(index);
     }
@@ -297,11 +297,18 @@ void main_window::load_chapter(int chapter_index)
     {
         return;
     }
+
+    current_chapter_index_ = chapter_index;
+    chapter_list_->blockSignals(true);
+    chapter_list_->setCurrentRow(current_chapter_index_);
+    chapter_list_->blockSignals(false);
+
     is_loading_content_ = true;
     novel_view_->clear_content();
     initial_chapter_to_load_ = chapter_index;
     emit request_chapter_content(chapter_index);
 }
+
 void main_window::update_progress_status()
 {
     QScrollBar* scrollBar = novel_view_->verticalScrollBar();
@@ -310,7 +317,22 @@ void main_window::update_progress_status()
         double progress = static_cast<double>(scrollBar->value()) / scrollBar->maximum() * 100.0;
         statusBar()->showMessage(QString("进度: %1%").arg(progress, 0, 'f', 2));
     }
+
+    auto progress = novel_view_->current_progress();
+    int new_chapter_index = progress.first;
+
+    if (new_chapter_index >= 0 && new_chapter_index != current_chapter_index_)
+    {
+        current_chapter_index_ = new_chapter_index;
+
+        chapter_list_->blockSignals(true);
+        chapter_list_->setCurrentRow(current_chapter_index_);
+        chapter_list_->blockSignals(false);
+
+        LOG_INFO("Chapter list selection synced to chapter {}", current_chapter_index_);
+    }
 }
+
 void main_window::select_font_dialog()
 {
     bool ok;
