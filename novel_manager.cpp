@@ -92,7 +92,7 @@ void novel_manager::parse_chapters_async()
     }
     DEFER(file.unmap(mapped_data));
 
-    std::string utf8_str = "第[一二三四五六七八九十百千万两0-9]+章[^\\r\\n]*";
+    std::string utf8_str = "第[零一二三四五六七八九十百千万两0-9]+章[^\\r\\n]*";
     std::string encoding_str;
     try
     {
