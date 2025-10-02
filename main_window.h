@@ -67,6 +67,7 @@ class main_window : public QMainWindow
     void setup_color_schemes();
     void reset_auto_scroll_speed();
     void apply_font_and_spacing();
+    void ensure_chapter_is_visible(int chapter_index);
 
     void save_progress();
     void load_progress(const QString& file_path);

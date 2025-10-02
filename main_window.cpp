@@ -303,6 +303,7 @@ void main_window::load_chapter(int chapter_index)
     chapter_list_->setCurrentRow(current_chapter_index_);
     chapter_list_->blockSignals(false);
 
+    ensure_chapter_is_visible(chapter_index);
     is_loading_content_ = true;
     novel_view_->clear_content();
     initial_chapter_to_load_ = chapter_index;
@@ -329,7 +330,8 @@ void main_window::update_progress_status()
         chapter_list_->setCurrentRow(current_chapter_index_);
         chapter_list_->blockSignals(false);
 
-        LOG_INFO("Chapter list selection synced to chapter {}", current_chapter_index_);
+        ensure_chapter_is_visible(current_chapter_index_);
+        LOG_INFO("chapter list selection synced to chapter {}", current_chapter_index_);
     }
 }
 
@@ -557,5 +559,18 @@ void main_window::load_progress(const QString& file_path)
         {
             load_chapter(0);
         }
+    }
+}
+void main_window::ensure_chapter_is_visible(int chapter_index)
+{
+    if (chapter_index < 0 || chapter_index >= chapter_list_->count())
+    {
+        return;
+    }
+
+    QListWidgetItem* item = chapter_list_->item(chapter_index);
+    if (item != nullptr)
+    {
+        chapter_list_->scrollToItem(item, QAbstractItemView::PositionAtCenter);
     }
 }
