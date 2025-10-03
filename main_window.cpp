@@ -3,6 +3,7 @@
 #include <QHBoxLayout>
 #include <QListWidget>
 #include <QSettings>
+#include <QToolButton>
 #include <QMenuBar>
 #include <QFontDialog>
 #include <QFontDatabase>
@@ -20,6 +21,11 @@
 #include "novel_view.h"
 #include "main_window.h"
 #include "novel_manager.h"
+
+static const char* kSelfName = "TXTReader";
+static const char* kRecentFiles = "RecentFiles";
+static const char* kLastChapterIndex = "last_chapter_index";
+static const char* kLastScrollRatio = "last_scroll_ratio";
 
 static QColor interpolate_color(const QColor& c1, const QColor& c2, qreal progress)
 {
@@ -95,7 +101,19 @@ void main_window::setup_ui()
 
     main_tool_bar_ = addToolBar("Main");
     main_tool_bar_->setMovable(false);
+
     open_file_action_ = main_tool_bar_->addAction("打开");
+    recent_files_action_ = main_tool_bar_->addAction("最近");
+    recent_files_menu_ = new QMenu(this);
+    recent_files_action_->setMenu(recent_files_menu_);
+
+    auto* recent_button = qobject_cast<QToolButton*>(main_tool_bar_->widgetForAction(recent_files_action_));
+    if (recent_button != nullptr)
+    {
+        recent_button->setPopupMode(QToolButton::InstantPopup);
+        recent_button->setStyleSheet("QToolButton::menu-indicator { image: none; }");
+    }
+
     toggle_list_action_ = main_tool_bar_->addAction("目录");
     main_tool_bar_->addSeparator();
     select_font_action_ = main_tool_bar_->addAction("设置字体");
@@ -150,7 +168,7 @@ void main_window::setup_connections()
     connect(del_line_spacing_action_, &QAction::triggered, this, &main_window::decrease_line_spacing);
     connect(add_letter_spacing_action_, &QAction::triggered, this, &main_window::increase_letter_spacing);
     connect(del_letter_spacing_action_, &QAction::triggered, this, &main_window::decrease_letter_spacing);
-
+    connect(recent_files_menu_, &QMenu::aboutToShow, this, &main_window::populate_recent_files_menu);
     connect(select_font_action_, &QAction::triggered, this, &main_window::select_font_dialog);
     connect(background_animation_timer_, &QTimer::timeout, this, &main_window::update_background_gradient);
     connect(color_action_, &QAction::triggered, this, &main_window::on_color_action);
@@ -180,14 +198,7 @@ void main_window::paintEvent(QPaintEvent* event)
 void main_window::open_file_dialog()
 {
     QString file_path = QFileDialog::getOpenFileName(this, "打开小说", "", "Text Files (*.txt)");
-    if (!file_path.isEmpty())
-    {
-        save_progress();
-        chapter_list_->clear();
-        novel_view_->clear_content();
-        statusBar()->showMessage("正在解析章节...");
-        emit request_load_file(file_path);
-    }
+    load_new_file(file_path);
 }
 void main_window::toggle_chapter_list_visibility() { chapter_list_->setVisible(!chapter_list_->isVisible()); }
 void main_window::on_chapter_list_item_clicked(QListWidgetItem* item)
@@ -512,12 +523,12 @@ void main_window::save_progress()
         return;
     }
 
-    QSettings settings("TXTReader", "TXTReader");
+    QSettings settings(kSelfName, kSelfName);
     QString absolute_path = QFileInfo(current_file_path).absoluteFilePath();
     QByteArray key = absolute_path.toUtf8().toBase64();
     settings.beginGroup(QString(key));
-    settings.setValue("last_chapter_index", chapter_index);
-    settings.setValue("last_scroll_ratio", scroll_ratio);
+    settings.setValue(kLastChapterIndex, chapter_index);
+    settings.setValue(kLastScrollRatio, scroll_ratio);
     settings.endGroup();
     auto setting_list = settings.childGroups();
     for (const auto& it : setting_list)
@@ -530,7 +541,7 @@ void main_window::save_progress()
 
 void main_window::load_progress(const QString& file_path)
 {
-    QSettings settings("TXTReader", "TXTReader");
+    QSettings settings(kSelfName, kSelfName);
     QString absolute_path = QFileInfo(file_path).absoluteFilePath();
     QByteArray key = absolute_path.toUtf8().toBase64();
     auto setting_list = settings.childGroups();
@@ -541,8 +552,8 @@ void main_window::load_progress(const QString& file_path)
     if (setting_list.contains(QString(key)))
     {
         settings.beginGroup(QString(key));
-        int chapter_index = settings.value("last_chapter_index", 0).toInt();
-        double scroll_ratio = settings.value("last_scroll_ratio", 0.0).toDouble();
+        int chapter_index = settings.value(kLastChapterIndex, 0).toInt();
+        double scroll_ratio = settings.value(kLastScrollRatio, 0.0).toDouble();
         settings.endGroup();
 
         LOG_INFO("loading progress {} chapter {} ratio {}", absolute_path.toStdString(), chapter_index, scroll_ratio);
@@ -573,4 +584,79 @@ void main_window::ensure_chapter_is_visible(int chapter_index)
     {
         chapter_list_->scrollToItem(item, QAbstractItemView::PositionAtCenter);
     }
+}
+
+void main_window::update_recent_files(const QString& file_path)
+{
+    (void)this;
+    QSettings settings(kSelfName, kSelfName);
+    QStringList recent_files = settings.value(kRecentFiles).toStringList();
+
+    recent_files.removeAll(file_path);
+    recent_files.prepend(file_path);
+    while (recent_files.size() > 10)
+    {
+        recent_files.removeLast();
+    }
+    settings.setValue(kRecentFiles, recent_files);
+}
+
+void main_window::populate_recent_files_menu()
+{
+    recent_files_menu_->clear();
+    QSettings settings(kSelfName, kSelfName);
+    QStringList recent_files = settings.value(kRecentFiles).toStringList();
+
+    if (recent_files.isEmpty())
+    {
+        recent_files_menu_->addAction("（无最近文件）")->setEnabled(false);
+    }
+    else
+    {
+        for (const QString& file_path : recent_files)
+        {
+            QString file_name = QFileInfo(file_path).fileName();
+            QAction* action = recent_files_menu_->addAction(file_name);
+            action->setData(file_path);
+            connect(action, &QAction::triggered, this, &main_window::open_recent_file);
+        }
+    }
+
+    recent_files_menu_->addSeparator();
+    QAction* clear_action = recent_files_menu_->addAction("清空列表");
+    connect(clear_action, &QAction::triggered, this, &main_window::clear_recent_files);
+}
+
+void main_window::open_recent_file()
+{
+    auto* action = qobject_cast<QAction*>(sender());
+    if (action != nullptr)
+    {
+        QString file_path = action->data().toString();
+        load_new_file(file_path);
+    }
+}
+
+void main_window::clear_recent_files()
+{
+    (void)this;
+    QSettings settings(kSelfName, kSelfName);
+    settings.remove(kRecentFiles);
+    LOG_INFO("recent files list cleared.");
+}
+
+void main_window::load_new_file(const QString& file_path)
+{
+    if (file_path.isEmpty())
+    {
+        return;
+    }
+
+    save_progress();
+
+    chapter_list_->clear();
+    novel_view_->clear_content();
+    statusBar()->showMessage("正在解析章节...");
+    update_recent_files(file_path);
+    emit request_load_file(file_path);
 }

@@ -39,6 +39,9 @@ class main_window : public QMainWindow
     void on_chapter_list_item_clicked(QListWidgetItem* item);
     void select_font_dialog();
 
+    void populate_recent_files_menu();
+    void open_recent_file();
+    void clear_recent_files();
     void on_chapter_found(const QString& title);
     void on_parsing_finished(size_t total_chapters);
     void on_chapter_content_ready(int chapter_index, const QString& content);
@@ -68,7 +71,8 @@ class main_window : public QMainWindow
     void reset_auto_scroll_speed();
     void apply_font_and_spacing();
     void ensure_chapter_is_visible(int chapter_index);
-
+    void update_recent_files(const QString& file_path);
+    void load_new_file(const QString& file_path);
     void save_progress();
     void load_progress(const QString& file_path);
 
@@ -100,6 +104,9 @@ class main_window : public QMainWindow
     QAction* add_letter_spacing_action_;
     QAction* del_letter_spacing_action_;
     QAction* select_font_action_;
+    QAction* recent_files_action_;
+    QMenu* recent_files_menu_;
+
     bool auto_scroll_ = false;
     int speed_ = 60;
     QFont view_font_;
@@ -110,7 +117,6 @@ class main_window : public QMainWindow
     size_t total_chapters_ = 0;
     double scroll_ratio_to_restore_ = 0.0;
     int chapter_index_to_restore_ = -1;
-
     bool is_loading_content_ = false;
     int initial_chapter_to_load_ = -1;
     int current_chapter_index_ = -1;
