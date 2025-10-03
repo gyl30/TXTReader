@@ -4,6 +4,7 @@
 #include <utility>
 #include "log.h"
 #include "novel_view.h"
+#include "context_menu.h"
 
 static inline bool selection_is_valid(const text_position& pos) { return pos.chapter_layout_index != -1; }
 static inline bool operator==(const text_position& lhs, const text_position& rhs)
@@ -324,14 +325,24 @@ void novel_view::mouseReleaseEvent(QMouseEvent* event)
 
 void novel_view::contextMenuEvent(QContextMenuEvent* event)
 {
-    QMenu context_menu(this);
-    QAction* copy_action = context_menu.addAction("复制");
-    connect(copy_action, &QAction::triggered, this, &novel_view::copy_selection);
+    auto* menu = new context_menu(this);
+
+    menu->addAction("复制");
+
+    connect(menu,
+            &context_menu::triggered,
+            this,
+            [this](const QString& actionText)
+            {
+                if (actionText == "复制")
+                {
+                    copy_selection();
+                }
+            });
 
     QString selected = selected_text();
-    copy_action->setEnabled(!selected.isEmpty());
-
-    context_menu.exec(event->globalPos());
+    menu->setActionEnabled("复制", !selected.isEmpty());
+    menu->exec(event->globalPos());
 }
 
 void novel_view::copy_selection()
@@ -597,7 +608,7 @@ text_position novel_view::map_point_to_text_position(const QPoint& point) const 
 
 QString novel_view::selected_text() const
 {
-    if (selection_is_valid(selection_start_) || selection_is_valid(selection_end_) || selection_start_ == selection_end_)
+    if (!selection_is_valid(selection_start_) || !selection_is_valid(selection_end_) || selection_start_ == selection_end_)
     {
         return {};
     }

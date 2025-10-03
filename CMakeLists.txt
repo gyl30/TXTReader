@@ -39,6 +39,7 @@ add_executable(TXTReader
     novel_manager.h
     novel_manager.cpp
     novel_view.cpp
+    context_menu.cpp
 )
 
 target_include_directories(TXTReader
