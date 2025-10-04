@@ -26,11 +26,11 @@ class novel_manager : public QObject
     void chapter_content_ready(int chapter_index, const QString& content);
 
    public slots:
-    void load_file(const QString& file_path);
+    void load_file(const QString& file_path, const QString& chapter_regex);
     void fetch_chapter_content(int chapter_index);
 
    private:
-    void parse_chapters_async();
+    void parse_chapters_async(const QString& chapter_regex);
 
    private:
     QString file_path_;

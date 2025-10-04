@@ -48,16 +48,16 @@ novel_manager::novel_manager(QObject* parent) : QObject(parent)
 
 novel_manager::~novel_manager() { LOG_INFO("novel_manager destroyed"); }
 
-void novel_manager::load_file(const QString& file_path)
+void novel_manager::load_file(const QString& file_path, const QString& chapter_regex)
 {
     setProperty("current_file_path", file_path);
     file_path_ = file_path;
     chapters_.clear();
     detected_encoding_ = detect_file_encoding(file_path);
-    parse_chapters_async();
+    parse_chapters_async(chapter_regex);
 }
 
-void novel_manager::parse_chapters_async()
+void novel_manager::parse_chapters_async(const QString& chapter_regex)
 {
     if (file_path_.isEmpty())
     {
@@ -92,7 +92,9 @@ void novel_manager::parse_chapters_async()
     }
     DEFER(file.unmap(mapped_data));
 
-    std::string utf8_str = "第[零一二三四五六七八九十百千万两0-9]+章[^\\r\\n]*";
+    LOG_INFO("parse chapters {} using regex {} with encoding {}", file_path_.toStdString(), chapter_regex.toStdString(), detected_encoding_);
+    // std::string utf8_str = "第[零一二三四五六七八九十百千万两0-9]+章[^\\r\\n]*";
+    std::string utf8_str = chapter_regex.toStdString();
     std::string encoding_str;
     try
     {

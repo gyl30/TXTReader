@@ -30,7 +30,7 @@ class main_window : public QMainWindow
     void paintEvent(QPaintEvent* event) override;
 
    signals:
-    void request_load_file(const QString& file_path);
+    void request_load_file(const QString& file_path, const QString& chapter_regex);
     void request_chapter_content(int chapter_index);
 
    private slots:
@@ -38,6 +38,7 @@ class main_window : public QMainWindow
     void toggle_chapter_list_visibility();
     void on_chapter_list_item_clicked(QListWidgetItem* item);
     void select_font_dialog();
+    void open_regex_dialog();
 
     void populate_recent_files_menu();
     void open_recent_file();
@@ -76,7 +77,11 @@ class main_window : public QMainWindow
     void save_progress();
     void load_progress(const QString& file_path);
 
+    QString get_current_regex();
+    void setup_shortcuts();
+
    private:
+    QString current_regex_;
     QList<QColor> color_schemes_;
     int scheme_index_ = 0;
     QColor current_color_;

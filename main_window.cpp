@@ -1,5 +1,4 @@
 #include <QFileDialog>
-#include <QGraphicsDropShadowEffect>
 #include <QHBoxLayout>
 #include <QListWidget>
 #include <QSettings>
@@ -16,6 +15,9 @@
 #include <QElapsedTimer>
 #include <QToolBar>
 #include <QThread>
+#include <QInputDialog>
+#include <QKeySequence>
+#include <QShortcut>
 #include "log.h"
 #include "splitter.h"
 #include "novel_view.h"
@@ -23,9 +25,12 @@
 #include "novel_manager.h"
 
 static const char* kSelfName = "TXTReader";
-static const char* kRecentFiles = "RecentFiles";
+static const char* kRecentFiles = "recent_files";
 static const char* kLastChapterIndex = "last_chapter_index";
 static const char* kLastScrollRatio = "last_scroll_ratio";
+static const char* kChapterRegex = "chapter_regex";
+static const char* kDefaultChapterRegex = "第[一二三四五六七八九十百千万两0-9]+章[^\\r\\n]*";
+static const char* kChapterRegexShortcut = "Ctrl+R";
 
 static QColor interpolate_color(const QColor& c1, const QColor& c2, qreal progress)
 {
@@ -63,6 +68,7 @@ main_window::main_window(QWidget* parent) : QMainWindow(parent)
     setup_ui();
     setup_color_schemes();
     setup_connections();
+    setup_shortcuts();
     worker_thread_->start();
     novel_view_->set_font_style(view_font_, line_spacing_, letter_spacing_);
     apply_font_and_spacing();
@@ -658,5 +664,49 @@ void main_window::load_new_file(const QString& file_path)
     novel_view_->clear_content();
     statusBar()->showMessage("正在解析章节...");
     update_recent_files(file_path);
-    emit request_load_file(file_path);
+    emit request_load_file(file_path, get_current_regex());
+}
+void main_window::setup_shortcuts()
+{
+    auto* shortcut = new QShortcut(QKeySequence(tr(kChapterRegexShortcut)), this);
+    connect(shortcut, &QShortcut::activated, this, &main_window::open_regex_dialog);
+}
+
+QString main_window::get_current_regex()
+{
+    (void)this;
+    QSettings settings(kSelfName, kSelfName);
+    return settings.value(kChapterRegex, kDefaultChapterRegex).toString();
+}
+
+void main_window::open_regex_dialog()
+{
+    QString old_regex = get_current_regex();
+
+    bool ok;
+    QString new_regex = QInputDialog::getText(this, "设置章节正则表达式", "正则表达式:", QLineEdit::Normal, old_regex, &ok);
+    if (!ok)
+    {
+        return;
+    }
+    if (new_regex.isEmpty())
+    {
+        return;
+    }
+    if (new_regex == old_regex)
+    {
+        return;
+    }
+
+    LOG_INFO("chapter regex changed from {} to {}", old_regex.toStdString(), new_regex.toStdString());
+
+    QSettings settings(kSelfName, kSelfName);
+    settings.setValue(kChapterRegex, new_regex);
+
+    QString current_file_path = novel_manager_->property("current_file_path").toString();
+    if (!current_file_path.isEmpty())
+    {
+        LOG_INFO("reloading file {} with new regex", current_file_path.toStdString());
+        load_new_file(current_file_path);
+    }
 }
