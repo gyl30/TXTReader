@@ -74,6 +74,7 @@ class main_window : public QMainWindow
     void ensure_chapter_is_visible(int chapter_index);
     void update_recent_files(const QString& file_path);
     void load_new_file(const QString& file_path);
+    void remove_recent_file(const QString& file_path);
     void save_progress();
     void load_progress(const QString& file_path);
 

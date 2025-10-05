@@ -15,6 +15,7 @@
 #include <QElapsedTimer>
 #include <QToolBar>
 #include <QThread>
+#include <QVariantList>
 #include <QInputDialog>
 #include <QKeySequence>
 #include <QShortcut>
@@ -596,14 +597,33 @@ void main_window::update_recent_files(const QString& file_path)
 {
     (void)this;
     QSettings settings(kSelfName, kSelfName);
-    QStringList recent_files = settings.value(kRecentFiles).toStringList();
+    QVariantList recent_files = settings.value(kRecentFiles).toList();
+    int existing_index = -1;
+    for (int i = 0; i < recent_files.size(); ++i)
+    {
+        if (recent_files[i].toMap().value("filePath").toString() == file_path)
+        {
+            existing_index = i;
+            break;
+        }
+    }
 
-    recent_files.removeAll(file_path);
-    recent_files.prepend(file_path);
+    if (existing_index != -1)
+    {
+        recent_files.removeAt(existing_index);
+    }
+
+    QVariantMap file_info;
+    file_info["filePath"] = file_path;
+    file_info["regex"] = get_current_regex();
+
+    recent_files.prepend(file_info);
+
     while (recent_files.size() > 10)
     {
         recent_files.removeLast();
     }
+
     settings.setValue(kRecentFiles, recent_files);
 }
 
@@ -611,7 +631,7 @@ void main_window::populate_recent_files_menu()
 {
     recent_files_menu_->clear();
     QSettings settings(kSelfName, kSelfName);
-    QStringList recent_files = settings.value(kRecentFiles).toStringList();
+    QVariantList recent_files = settings.value(kRecentFiles).toList();
 
     if (recent_files.isEmpty())
     {
@@ -619,11 +639,13 @@ void main_window::populate_recent_files_menu()
     }
     else
     {
-        for (const QString& file_path : recent_files)
+        for (const QVariant& file_variant : recent_files)
         {
+            QVariantMap file_info = file_variant.toMap();
+            QString file_path = file_info.value("filePath").toString();
             QString file_name = QFileInfo(file_path).fileName();
             QAction* action = recent_files_menu_->addAction(file_name);
-            action->setData(file_path);
+            action->setData(file_info);
             connect(action, &QAction::triggered, this, &main_window::open_recent_file);
         }
     }
@@ -636,11 +658,45 @@ void main_window::populate_recent_files_menu()
 void main_window::open_recent_file()
 {
     auto* action = qobject_cast<QAction*>(sender());
-    if (action != nullptr)
+    if (action == nullptr)
     {
-        QString file_path = action->data().toString();
-        load_new_file(file_path);
+        return;
     }
+    QVariantMap file_info = action->data().toMap();
+    QString file_path = file_info.value("filePath").toString();
+    QString regex = file_info.value("regex").toString();
+
+    if (!QFile::exists(file_path))
+    {
+        QMessageBox::warning(this, "文件未找到", QString("无法找到文件：\n%1\n\n该记录将被移除。").arg(file_path));
+        remove_recent_file(file_path);
+        return;
+    }
+
+    LOG_INFO("opening recent file {} with its specific regex {}", file_path.toStdString(), regex.toStdString());
+
+    QSettings settings(kSelfName, kSelfName);
+    settings.setValue(kChapterRegex, regex);
+    load_new_file(file_path);
+}
+
+void main_window::remove_recent_file(const QString& file_path)
+{
+    (void)this;
+    QSettings settings(kSelfName, kSelfName);
+    QVariantList recent_files = settings.value(kRecentFiles).toList();
+
+    for (int i = 0; i < recent_files.size(); ++i)
+    {
+        if (recent_files[i].toMap().value("filePath").toString() == file_path)
+        {
+            recent_files.removeAt(i);
+            break;
+        }
+    }
+
+    settings.setValue(kRecentFiles, recent_files);
+    LOG_INFO("removed non exist file from recent list {}", file_path.toStdString());
 }
 
 void main_window::clear_recent_files()
