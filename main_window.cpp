@@ -532,7 +532,7 @@ void main_window::save_progress()
 
     QSettings settings(kSelfName, kSelfName);
     QString absolute_path = QFileInfo(current_file_path).absoluteFilePath();
-    QByteArray key = absolute_path.toUtf8().toBase64();
+    QByteArray key = absolute_path.toUtf8().toBase64(QByteArray::Base64UrlEncoding);
     settings.beginGroup(QString(key));
     settings.setValue(kLastChapterIndex, chapter_index);
     settings.setValue(kLastScrollRatio, scroll_ratio);
@@ -550,7 +550,7 @@ void main_window::load_progress(const QString& file_path)
 {
     QSettings settings(kSelfName, kSelfName);
     QString absolute_path = QFileInfo(file_path).absoluteFilePath();
-    QByteArray key = absolute_path.toUtf8().toBase64();
+    QByteArray key = absolute_path.toUtf8().toBase64(QByteArray::Base64UrlEncoding);
     auto setting_list = settings.childGroups();
     for (const auto& it : setting_list)
     {
