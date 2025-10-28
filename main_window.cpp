@@ -767,8 +767,14 @@ void main_window::load_new_file(const QString& file_path)
 }
 void main_window::setup_shortcuts()
 {
-    auto* shortcut = new QShortcut(QKeySequence(tr(kChapterRegexShortcut)), this);
-    connect(shortcut, &QShortcut::activated, this, &main_window::open_regex_dialog);
+    auto* regex_shortcut = new QShortcut(QKeySequence(tr(kChapterRegexShortcut)), this);
+    connect(regex_shortcut, &QShortcut::activated, this, &main_window::open_regex_dialog);
+
+    auto* next_chapter_shortcut = new QShortcut(QKeySequence(Qt::Key_N), this);
+    connect(next_chapter_shortcut, &QShortcut::activated, this, &main_window::load_next_chapter_action);
+
+    auto* prev_chapter_shortcut = new QShortcut(QKeySequence(Qt::Key_P), this);
+    connect(prev_chapter_shortcut, &QShortcut::activated, this, &main_window::load_previous_chapter_action);
 }
 
 QString main_window::get_current_regex()
@@ -807,5 +813,21 @@ void main_window::open_regex_dialog()
     {
         LOG_INFO("reloading file {} with new regex", current_file_path.toStdString());
         load_new_file(current_file_path);
+    }
+}
+
+void main_window::load_next_chapter_action()
+{
+    if (total_chapters_ > 0 && current_chapter_index_ + 1 < static_cast<int>(total_chapters_))
+    {
+        load_chapter(current_chapter_index_ + 1);
+    }
+}
+
+void main_window::load_previous_chapter_action()
+{
+    if (current_chapter_index_ - 1 >= 0)
+    {
+        load_chapter(current_chapter_index_ - 1);
     }
 }

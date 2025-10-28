@@ -18,7 +18,7 @@ class QElapsedTimer;
 class QToolBar;
 class novel_view;
 class QThread;
-class QLabel;    // Forward declaration
+class QLabel;
 
 class main_window : public QMainWindow
 {
@@ -65,6 +65,8 @@ class main_window : public QMainWindow
     void decrease_line_spacing();
     void increase_letter_spacing();
     void decrease_letter_spacing();
+    void load_next_chapter_action();
+    void load_previous_chapter_action();
 
    private:
     void setup_ui();
@@ -134,4 +136,4 @@ class main_window : public QMainWindow
     QLabel* status_progress_label_ = nullptr;
 };
 
-#endif    // TXTREADER_MAIN_WINDOW_H
+#endif
