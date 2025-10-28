@@ -139,12 +139,12 @@ void novel_manager::parse_chapters_async(const QString& chapter_regex)
                 std::string utf8_title = boost::locale::conv::to_utf<char>(chapter.title, detected_encoding_, boost::locale::conv::method_type::skip);
                 chapter.title = utf8_title;
                 chapters_.push_back(chapter);
-                emit chapter_found(QString::fromStdString(utf8_title));
+                emit chapter_found(QString::fromStdString(utf8_title), chapter.offset);
             }
             catch (const boost::locale::conv::conversion_error&)
             {
                 chapter_parse_failed++;
-                emit chapter_found("[标题转换失败]");
+                emit chapter_found("[标题转换失败]", 0);
             }
         }
         LOG_INFO("parse chapters {} encoding {} chapters count {} failed {} success {}",
@@ -162,7 +162,7 @@ void novel_manager::parse_chapters_async(const QString& chapter_regex)
         full_text_chapter.title = title.toStdString();
         full_text_chapter.offset = 0;
         chapters_.push_back(full_text_chapter);
-        emit chapter_found(title);
+        emit chapter_found(title, 0);
     }
 
     emit parsing_finished(chapters_.size());

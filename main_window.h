@@ -6,6 +6,7 @@
 #include <QPair>
 #include <QFont>
 #include <QColor>
+#include "novel_manager.h"
 
 class QListWidget;
 class QSplitter;
@@ -17,6 +18,7 @@ class QElapsedTimer;
 class QToolBar;
 class novel_view;
 class QThread;
+class QLabel;    // Forward declaration
 
 class main_window : public QMainWindow
 {
@@ -43,7 +45,7 @@ class main_window : public QMainWindow
     void populate_recent_files_menu();
     void open_recent_file();
     void clear_recent_files();
-    void on_chapter_found(const QString& title);
+    void on_chapter_found(const QString& title, qint64 offset);
     void on_parsing_finished(size_t total_chapters);
     void on_chapter_content_ready(int chapter_index, const QString& content);
     void load_previous_chapter();
@@ -126,6 +128,10 @@ class main_window : public QMainWindow
     bool is_loading_content_ = false;
     int initial_chapter_to_load_ = -1;
     int current_chapter_index_ = -1;
+    QList<chapter_info> chapters_info_;
+
+    QLabel* status_chapter_label_ = nullptr;
+    QLabel* status_progress_label_ = nullptr;
 };
 
 #endif    // TXTREADER_MAIN_WINDOW_H

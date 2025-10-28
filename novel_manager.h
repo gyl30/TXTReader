@@ -21,7 +21,7 @@ class novel_manager : public QObject
     ~novel_manager() override;
 
    signals:
-    void chapter_found(const QString& title);
+    void chapter_found(const QString& title, qint64 offset);
     void parsing_finished(size_t total_chapters);
     void chapter_content_ready(int chapter_index, const QString& content);
 

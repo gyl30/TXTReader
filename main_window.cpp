@@ -19,6 +19,7 @@
 #include <QInputDialog>
 #include <QKeySequence>
 #include <QShortcut>
+#include <QLabel>
 #include "log.h"
 #include "splitter.h"
 #include "novel_view.h"
@@ -142,7 +143,11 @@ void main_window::setup_ui()
     color_change_timer_ = new QTimer(this);
     transition_start_time_ = new QElapsedTimer();
 
-    statusBar()->showMessage("就绪");
+    status_chapter_label_ = new QLabel(" 就绪");
+    status_progress_label_ = new QLabel("进度: --% ");
+    statusBar()->addWidget(status_chapter_label_, 1);
+    statusBar()->addPermanentWidget(status_progress_label_);
+
     statusBar()->setSizeGripEnabled(false);
 }
 
@@ -216,11 +221,21 @@ void main_window::on_chapter_list_item_clicked(QListWidgetItem* item)
         load_chapter(index);
     }
 }
-void main_window::on_chapter_found(const QString& title) { chapter_list_->addItem(title); }
+void main_window::on_chapter_found(const QString& title, qint64 offset)
+{
+    chapter_list_->addItem(title);
+    chapters_info_.append({title.toStdString(), offset});
+}
 void main_window::on_parsing_finished(size_t total_chapters)
 {
     total_chapters_ = total_chapters;
-    statusBar()->showMessage(QString("找到 %1 个章节。").arg(total_chapters_));
+    statusBar()->showMessage(QString("找到 %1 个章节。").arg(total_chapters_), 3000);
+    if (total_chapters == 0)
+    {
+        status_chapter_label_->setText(" 未找到章节");
+        status_progress_label_->setText("进度: 0.00%");
+    }
+
     QString current_file_path = novel_manager_->property("current_file_path").toString();
     if (!current_file_path.isEmpty())
     {
@@ -330,26 +345,51 @@ void main_window::load_chapter(int chapter_index)
 
 void main_window::update_progress_status()
 {
-    QScrollBar* scrollBar = novel_view_->verticalScrollBar();
-    if (scrollBar->maximum() > 0)
+    QPair<int, double> progress_pair = novel_view_->current_progress();
+    int current_chapter_idx = progress_pair.first;
+    double ratio_in_chapter = progress_pair.second;
+
+    if (current_chapter_idx < 0 || current_chapter_idx >= chapters_info_.size())
     {
-        double progress = static_cast<double>(scrollBar->value()) / scrollBar->maximum() * 100.0;
-        statusBar()->showMessage(QString("进度: %1%").arg(progress, 0, 'f', 2));
+        return;
     }
 
-    auto progress = novel_view_->current_progress();
-    int new_chapter_index = progress.first;
+    QString chapter_title = " " + QString::fromStdString(chapters_info_[current_chapter_idx].title);
+    status_chapter_label_->setText(chapter_title);
 
-    if (new_chapter_index >= 0 && new_chapter_index != current_chapter_index_)
+    QString current_file_path = novel_manager_->property("current_file_path").toString();
+    if (current_file_path.isEmpty() || total_chapters_ == 0)
     {
-        current_chapter_index_ = new_chapter_index;
+        status_progress_label_->setText("");
+        return;
+    }
+
+    qint64 file_size = QFileInfo(current_file_path).size();
+    if (file_size > 0)
+    {
+        qint64 current_offset = chapters_info_[current_chapter_idx].offset;
+        qint64 next_offset = (current_chapter_idx + 1 < chapters_info_.size()) ? chapters_info_[current_chapter_idx + 1].offset : file_size;
+        qint64 chapter_size = next_offset - current_offset;
+
+        qint64 read_bytes = current_offset + static_cast<qint64>(chapter_size * ratio_in_chapter);
+        double overall_progress = static_cast<double>(read_bytes) * 100.0 / file_size;
+
+        status_progress_label_->setText(QString("进度: %1% ").arg(overall_progress, 0, 'f', 2));
+    }
+    else
+    {
+        status_progress_label_->setText("进度: --% ");
+    }
+
+    if (current_chapter_idx != current_chapter_index_)
+    {
+        current_chapter_index_ = current_chapter_idx;
 
         chapter_list_->blockSignals(true);
         chapter_list_->setCurrentRow(current_chapter_index_);
         chapter_list_->blockSignals(false);
 
         ensure_chapter_is_visible(current_chapter_index_);
-        LOG_INFO("chapter list selection synced to chapter {}", current_chapter_index_);
     }
 }
 
@@ -716,9 +756,12 @@ void main_window::load_new_file(const QString& file_path)
 
     save_progress();
 
+    chapters_info_.clear();
     chapter_list_->clear();
     novel_view_->clear_content();
-    statusBar()->showMessage("正在解析章节...");
+    status_chapter_label_->setText(" 正在解析章节...");
+    status_progress_label_->setText("");
+
     update_recent_files(file_path);
     emit request_load_file(file_path, get_current_regex());
 }
