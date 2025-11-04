@@ -6,6 +6,9 @@
 #include <QPair>
 #include <QFont>
 #include <QColor>
+#include <QDropEvent>
+#include <QDragEnterEvent>
+#include <QMimeData>
 #include "novel_manager.h"
 
 class QListWidget;
@@ -30,6 +33,8 @@ class main_window : public QMainWindow
 
    protected:
     void paintEvent(QPaintEvent* event) override;
+    void dragEnterEvent(QDragEnterEvent* event) override;
+    void dropEvent(QDropEvent* event) override;
 
    signals:
     void request_load_file(const QString& file_path, const QString& chapter_regex);

@@ -62,6 +62,7 @@ static QFont default_font(qreal font_size)
 }
 main_window::main_window(QWidget* parent) : QMainWindow(parent)
 {
+    setAcceptDrops(true);
     worker_thread_ = new QThread(this);
     novel_manager_ = new novel_manager();
     novel_manager_->moveToThread(worker_thread_);
@@ -205,6 +206,44 @@ void main_window::paintEvent(QPaintEvent* event)
     {
         painter.fillRect(rect(), QColor("#FDF6E3"));
     }
+}
+void main_window::dragEnterEvent(QDragEnterEvent* event)
+{
+    if (event->mimeData()->hasUrls())
+    {
+        event->acceptProposedAction();
+    }
+}
+
+void main_window::dropEvent(QDropEvent* event)
+{
+    const QMimeData* mimeData = event->mimeData();
+
+    if (!mimeData->hasUrls())
+    {
+        return;
+    }
+    QList<QUrl> url_list = mimeData->urls();
+
+    if (!url_list.isEmpty())
+    {
+        QString filePath = url_list.first().toLocalFile();
+
+        if (!filePath.isEmpty())
+        {
+            LOG_INFO("file dropped {}", filePath.toStdString());
+
+            if (QFileInfo(filePath).suffix().toLower() == "txt")
+            {
+                load_new_file(filePath);
+            }
+            else
+            {
+                QMessageBox::warning(this, "文件类型不支持", "请拖拽 txt 格式的文本文件");
+            }
+        }
+    }
+    event->acceptProposedAction();
 }
 
 void main_window::open_file_dialog()
