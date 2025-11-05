@@ -31,15 +31,14 @@ set(UCHARDET_INCLUDE_DIR "${UCHARDET_INSTALL_PREFIX}/include")
 message(STATUS "Uchardet include path: ${UCHARDET_INCLUDE_DIR}")
 
 add_executable(TXTReader
-    main.cpp
     log.cpp
+    main.cpp
     splitter.cpp
-    main_window.h
-    main_window.cpp
-    novel_manager.h
-    novel_manager.cpp
+    tray_icon.cpp
     novel_view.cpp
+    main_window.cpp
     context_menu.cpp
+    novel_manager.cpp
 )
 
 target_include_directories(TXTReader

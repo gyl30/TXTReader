@@ -9,6 +9,7 @@
 #include <QDropEvent>
 #include <QDragEnterEvent>
 #include <QMimeData>
+#include "tray_icon.h"
 #include "novel_manager.h"
 
 class QListWidget;
@@ -35,6 +36,9 @@ class main_window : public QMainWindow
     void paintEvent(QPaintEvent* event) override;
     void dragEnterEvent(QDragEnterEvent* event) override;
     void dropEvent(QDropEvent* event) override;
+
+   protected:
+    void closeEvent(QCloseEvent* event) override;
 
    signals:
     void request_load_file(const QString& file_path, const QString& chapter_regex);
@@ -72,6 +76,8 @@ class main_window : public QMainWindow
     void decrease_letter_spacing();
     void load_next_chapter_action();
     void load_previous_chapter_action();
+
+    void quit_application();
 
    private:
     void setup_ui();
@@ -136,7 +142,7 @@ class main_window : public QMainWindow
     int initial_chapter_to_load_ = -1;
     int current_chapter_index_ = -1;
     QList<chapter_info> chapters_info_;
-
+    tray_icon* tray_icon_ = nullptr;
     QLabel* status_chapter_label_ = nullptr;
     QLabel* status_progress_label_ = nullptr;
 };

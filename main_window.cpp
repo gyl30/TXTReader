@@ -90,6 +90,11 @@ main_window::~main_window()
 
 void main_window::setup_ui()
 {
+    tray_icon_ = new tray_icon(this);
+    connect(tray_icon_, &tray_icon::show_hide_triggered, this, [this]() { isVisible() ? hide() : show(); });
+    connect(tray_icon_, &tray_icon::quit_triggered, this, &main_window::quit_application);
+    tray_icon_->show();
+
     splitter_ = new AnimatedSplitter(Qt::Horizontal, this);
     setCentralWidget(splitter_);
 
@@ -187,7 +192,23 @@ void main_window::setup_connections()
     connect(color_action_, &QAction::triggered, this, &main_window::on_color_action);
     connect(color_change_timer_, &QTimer::timeout, this, &main_window::change_to_next_color_scheme);
 }
-
+void main_window::quit_application()
+{
+    hide();
+    QApplication::quit();
+}
+void main_window::closeEvent(QCloseEvent* event)
+{
+    if (tray_icon_->isVisible())
+    {
+        hide();
+        event->ignore();
+    }
+    else
+    {
+        event->accept();
+    }
+}
 void main_window::paintEvent(QPaintEvent* event)
 {
     Q_UNUSED(event);

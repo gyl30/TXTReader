@@ -29,8 +29,9 @@ int main(int argc, char *argv[])
     init_log(app_name + ".log");
     DEFER(shutdown_log());
     QApplication a(argc, argv);
-    main_window w;
+    QApplication::setQuitOnLastWindowClosed(false);
     QApplication::setWindowIcon(emoji_to_icon("📖", 64));
+    main_window w;
     w.show();
     return QApplication::exec();
 }
