@@ -68,6 +68,7 @@ main_window::main_window(QWidget* parent) : QMainWindow(parent)
     novel_manager_->moveToThread(worker_thread_);
     view_font_ = default_font(38.0);
     LOG_INFO("default font {}", view_font_.toString().toStdString());
+    setup_static_backgrounds();
     setup_ui();
     setup_color_schemes();
     setup_connections();
@@ -143,6 +144,7 @@ void main_window::setup_ui()
     del_speed_ = main_tool_bar_->addAction("减速");
     main_tool_bar_->addSeparator();
     color_action_ = main_tool_bar_->addAction("开启动态背景");
+    switch_background_action_ = main_tool_bar_->addAction("切换背景");
 
     auto_scroll_timer_ = new QTimer(this);
     background_animation_timer_ = new QTimer(this);
@@ -191,6 +193,7 @@ void main_window::setup_connections()
     connect(background_animation_timer_, &QTimer::timeout, this, &main_window::update_background_gradient);
     connect(color_action_, &QAction::triggered, this, &main_window::on_color_action);
     connect(color_change_timer_, &QTimer::timeout, this, &main_window::change_to_next_color_scheme);
+    connect(switch_background_action_, &QAction::triggered, this, &main_window::switch_to_next_background);
 }
 void main_window::quit_application()
 {
@@ -225,7 +228,14 @@ void main_window::paintEvent(QPaintEvent* event)
     }
     else
     {
-        painter.fillRect(rect(), QColor("#FDF6E3"));
+        if (!static_backgrounds_.isEmpty())
+        {
+            painter.fillRect(rect(), static_backgrounds_[current_static_bg_index_]);
+        }
+        else
+        {
+            painter.fillRect(rect(), QColor("#FDF6E3"));
+        }
     }
 }
 void main_window::dragEnterEvent(QDragEnterEvent* event)
@@ -557,6 +567,21 @@ void main_window::reset_auto_scroll_speed()
     }
 }
 
+void main_window::setup_static_backgrounds()
+{
+    static_backgrounds_.append(QColor("#FDF6E3"));
+    static_backgrounds_.append(QColor("#C7EDCC"));
+    static_backgrounds_.append(QColor("#D6EAF8"));
+    static_backgrounds_.append(QColor("#F5EEF8"));
+    static_backgrounds_.append(QColor("#FAE5D3"));
+    static_backgrounds_.append(QColor("#E5E7E9"));
+
+    if (!static_backgrounds_.isEmpty())
+    {
+        last_used_static_color_ = static_backgrounds_.first();
+    }
+}
+
 void main_window::setup_color_schemes()
 {
     color_schemes_.append(QColor("#E0E6F8"));
@@ -600,7 +625,9 @@ void main_window::on_color_action()
     is_dynamic_background_ = !is_dynamic_background_;
     if (is_dynamic_background_ && !color_schemes_.isEmpty())
     {
+        last_used_static_color_ = static_backgrounds_[current_static_bg_index_];
         color_action_->setText("关闭动态背景");
+        switch_background_action_->setEnabled(false);
         change_to_next_color_scheme();
         background_animation_timer_->start(1200);
         color_change_timer_->start(5000);
@@ -608,11 +635,33 @@ void main_window::on_color_action()
     else
     {
         color_action_->setText("开启动态背景");
+        switch_background_action_->setEnabled(true);
         background_animation_timer_->stop();
         color_change_timer_->stop();
+        current_static_bg_index_ = static_backgrounds_.indexOf(last_used_static_color_);
+        if (current_static_bg_index_ == -1)
+        {
+            current_static_bg_index_ = 0;
+        }
         update();
     }
 }
+void main_window::switch_to_next_background()
+{
+    if (static_backgrounds_.size() < 2)
+    {
+        return;
+    }
+
+    current_static_bg_index_ = (current_static_bg_index_ + 1) % static_cast<int>(static_backgrounds_.size());
+
+    if (is_dynamic_background_)
+    {
+        is_dynamic_background_ = false;
+    }
+    update();
+}
+
 void main_window::save_progress()
 {
     QString current_file_path = novel_manager_->property("current_file_path").toString();

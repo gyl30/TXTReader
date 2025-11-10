@@ -71,6 +71,7 @@ class main_window : public QMainWindow
     void on_color_action();
     void change_to_next_color_scheme();
     void increase_line_spacing();
+    void switch_to_next_background();
     void decrease_line_spacing();
     void increase_letter_spacing();
     void decrease_letter_spacing();
@@ -83,6 +84,7 @@ class main_window : public QMainWindow
     void setup_ui();
     void setup_connections();
     void load_chapter(int chapter_index);
+    void setup_static_backgrounds();
     void setup_color_schemes();
     void reset_auto_scroll_speed();
     void apply_font_and_spacing();
@@ -98,6 +100,9 @@ class main_window : public QMainWindow
 
    private:
     QString current_regex_;
+    QList<QColor> static_backgrounds_;
+    int current_static_bg_index_ = 0;
+    QColor last_used_static_color_;
     QList<QColor> color_schemes_;
     int scheme_index_ = 0;
     QColor current_color_;
@@ -114,6 +119,7 @@ class main_window : public QMainWindow
     QToolBar* main_tool_bar_;
     QAction* open_file_action_;
     QAction* color_action_;
+    QAction* switch_background_action_;
     QAction* toggle_list_action_;
     QAction* add_font_action_;
     QAction* del_font_action_;
