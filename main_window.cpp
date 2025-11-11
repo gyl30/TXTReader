@@ -98,7 +98,7 @@ void main_window::setup_ui()
     connect(tray_icon_, &tray_icon::quit_triggered, this, &main_window::quit_application);
     tray_icon_->show();
 
-    splitter_ = new AnimatedSplitter(Qt::Horizontal, this);
+    splitter_ = new animated_splitter(Qt::Horizontal, this);
     setCentralWidget(splitter_);
 
     chapter_list_ = new QListWidget(splitter_);

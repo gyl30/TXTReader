@@ -1,7 +1,7 @@
 #include "splitter.h"
 #include <QPainter>
 
-AnimatedSplitterHandle::AnimatedSplitterHandle(Qt::Orientation orientation, QSplitter* parent) : QSplitterHandle(orientation, parent), offset_(0)
+animated_splitter_handle::animated_splitter_handle(Qt::Orientation orientation, QSplitter* parent) : QSplitterHandle(orientation, parent), offset_(0)
 {
     timer_ = new QTimer(this);
     connect(timer_,
@@ -19,7 +19,7 @@ AnimatedSplitterHandle::AnimatedSplitterHandle(Qt::Orientation orientation, QSpl
     timer_->start(300);
 }
 
-void AnimatedSplitterHandle::paintEvent(QPaintEvent* /*event*/)
+void animated_splitter_handle::paintEvent(QPaintEvent* /*event*/)
 {
     QPainter painter(this);
     QRect r = rect();

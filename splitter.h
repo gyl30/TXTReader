@@ -5,11 +5,11 @@
 #include <QSplitterHandle>
 #include <QTimer>
 
-class AnimatedSplitterHandle : public QSplitterHandle
+class animated_splitter_handle : public QSplitterHandle
 {
     Q_OBJECT
    public:
-    AnimatedSplitterHandle(Qt::Orientation orientation, QSplitter* parent);
+    animated_splitter_handle(Qt::Orientation orientation, QSplitter* parent);
 
    protected:
     void paintEvent(QPaintEvent* event) override;
@@ -19,13 +19,13 @@ class AnimatedSplitterHandle : public QSplitterHandle
     int offset_;
 };
 
-class AnimatedSplitter : public QSplitter
+class animated_splitter : public QSplitter
 {
     Q_OBJECT
    public:
-    explicit AnimatedSplitter(Qt::Orientation orientation, QWidget* parent = nullptr) : QSplitter(orientation, parent) {}
+    explicit animated_splitter(Qt::Orientation orientation, QWidget* parent = nullptr) : QSplitter(orientation, parent) {}
 
    protected:
-    QSplitterHandle* createHandle() override { return new AnimatedSplitterHandle(orientation(), this); }
+    QSplitterHandle* createHandle() override { return new animated_splitter_handle(orientation(), this); }
 };
 #endif
