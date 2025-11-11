@@ -20,6 +20,7 @@
 #include <QKeySequence>
 #include <QShortcut>
 #include <QLabel>
+#include <QtMath>
 #include "log.h"
 #include "splitter.h"
 #include "novel_view.h"
@@ -78,6 +79,7 @@ main_window::main_window(QWidget* parent) : QMainWindow(parent)
     apply_font_and_spacing();
     setStyleSheet("QSplitter, QListWidget, QToolBar, QStatusBar, QAbstractScrollArea { background-color: transparent; border: none; }");
     setWindowTitle("TXT 小说阅读器");
+    auto_save_timer_->start(8000);
     resize(1024, 768);
 }
 
@@ -147,6 +149,7 @@ void main_window::setup_ui()
     switch_background_action_ = main_tool_bar_->addAction("切换背景");
 
     auto_scroll_timer_ = new QTimer(this);
+    auto_save_timer_ = new QTimer(this);
     background_animation_timer_ = new QTimer(this);
     color_change_timer_ = new QTimer(this);
     transition_start_time_ = new QElapsedTimer();
@@ -180,6 +183,7 @@ void main_window::setup_connections()
     connect(novel_view_->verticalScrollBar(), &QScrollBar::valueChanged, this, &main_window::update_progress_status);
     connect(scroll_action_, &QAction::triggered, this, &main_window::auto_scroll_click);
     connect(auto_scroll_timer_, &QTimer::timeout, this, &main_window::perform_auto_scroll);
+    connect(auto_save_timer_, &QTimer::timeout, this, &main_window::save_progress);
     connect(add_speed_, &QAction::triggered, this, &main_window::increase_auto_speed);
     connect(del_speed_, &QAction::triggered, this, &main_window::decrease_auto_speed);
     connect(add_font_action_, &QAction::triggered, this, &main_window::increase_font_size);
@@ -197,11 +201,13 @@ void main_window::setup_connections()
 }
 void main_window::quit_application()
 {
+    save_progress();
     hide();
     QApplication::quit();
 }
 void main_window::closeEvent(QCloseEvent* event)
 {
+    save_progress();
     if (tray_icon_->isVisible())
     {
         hide();
@@ -396,6 +402,7 @@ void main_window::load_next_chapter()
 }
 void main_window::load_chapter(int chapter_index)
 {
+    save_progress();
     if (chapter_index < 0 || static_cast<size_t>(chapter_index) >= total_chapters_)
     {
         return;
@@ -441,8 +448,8 @@ void main_window::update_progress_status()
         qint64 next_offset = (current_chapter_idx + 1 < chapters_info_.size()) ? chapters_info_[current_chapter_idx + 1].offset : file_size;
         qint64 chapter_size = next_offset - current_offset;
 
-        qint64 read_bytes = current_offset + static_cast<qint64>(chapter_size * ratio_in_chapter);
-        double overall_progress = static_cast<double>(read_bytes) * 100.0 / file_size;
+        qint64 read_bytes = current_offset + static_cast<qint64>(static_cast<double>(chapter_size) * ratio_in_chapter);
+        double overall_progress = static_cast<double>(read_bytes) * 100.0 / static_cast<double>(file_size);
 
         status_progress_label_->setText(QString("进度: %1% ").arg(overall_progress, 0, 'f', 2));
     }
@@ -655,10 +662,6 @@ void main_window::switch_to_next_background()
 
     current_static_bg_index_ = (current_static_bg_index_ + 1) % static_cast<int>(static_backgrounds_.size());
 
-    if (is_dynamic_background_)
-    {
-        is_dynamic_background_ = false;
-    }
     update();
 }
 
@@ -679,6 +682,12 @@ void main_window::save_progress()
         return;
     }
 
+    if (current_file_path == last_saved_file_path_ && chapter_index == last_saved_chapter_index_ &&
+        qAbs(scroll_ratio - last_saved_scroll_ratio_) < 0.001)
+    {
+        return;
+    }
+
     QSettings settings(kSelfName, kSelfName);
     QString absolute_path = QFileInfo(current_file_path).absoluteFilePath();
     QByteArray key = absolute_path.toUtf8().toBase64(QByteArray::Base64UrlEncoding);
@@ -686,13 +695,12 @@ void main_window::save_progress()
     settings.setValue(kLastChapterIndex, chapter_index);
     settings.setValue(kLastScrollRatio, scroll_ratio);
     settings.endGroup();
-    auto setting_list = settings.childGroups();
-    for (const auto& it : setting_list)
-    {
-        LOG_INFO("save progress {}", it.toStdString());
-    }
 
-    LOG_INFO("saved progress {} chapter {} ratio {}", key.toStdString(), chapter_index, scroll_ratio);
+    last_saved_file_path_ = current_file_path;
+    last_saved_chapter_index_ = chapter_index;
+    last_saved_scroll_ratio_ = scroll_ratio;
+
+    LOG_INFO("progress saved {} chapter {} ratio {}", key.toStdString(), chapter_index, scroll_ratio);
 }
 
 void main_window::load_progress(const QString& file_path)
@@ -864,6 +872,10 @@ void main_window::load_new_file(const QString& file_path)
     }
 
     save_progress();
+
+    last_saved_file_path_.clear();
+    last_saved_chapter_index_ = -1;
+    last_saved_scroll_ratio_ = -1.0;
 
     chapters_info_.clear();
     chapter_list_->clear();

@@ -101,7 +101,7 @@ class main_window : public QMainWindow
    private:
     QString current_regex_;
     QList<QColor> static_backgrounds_;
-    int current_static_bg_index_ = 0;
+    qsizetype current_static_bg_index_ = 0;
     QColor last_used_static_color_;
     QList<QColor> color_schemes_;
     int scheme_index_ = 0;
@@ -113,6 +113,7 @@ class main_window : public QMainWindow
     bool is_dynamic_background_ = false;
     QTimer* background_animation_timer_;
     QTimer* auto_scroll_timer_;
+    QTimer* auto_save_timer_ = nullptr;
     QListWidget* chapter_list_;
     novel_view* novel_view_;
     QSplitter* splitter_;
@@ -151,6 +152,10 @@ class main_window : public QMainWindow
     tray_icon* tray_icon_ = nullptr;
     QLabel* status_chapter_label_ = nullptr;
     QLabel* status_progress_label_ = nullptr;
+
+    QString last_saved_file_path_;
+    int last_saved_chapter_index_ = -1;
+    double last_saved_scroll_ratio_ = -1.0;
 };
 
 #endif
