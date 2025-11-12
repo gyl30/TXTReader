@@ -35,10 +35,13 @@ add_executable(TXTReader
     main.cpp
     splitter.cpp
     tray_icon.cpp
-    novel_view.cpp
+    app_state.cpp
     main_window.cpp
+    novel_view.cpp
     context_menu.cpp
     novel_manager.cpp
+    app_controller.cpp
+    settings_manager.cpp
 )
 
 target_include_directories(TXTReader

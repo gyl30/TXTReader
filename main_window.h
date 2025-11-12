@@ -9,19 +9,19 @@
 #include <QDropEvent>
 #include <QDragEnterEvent>
 #include <QMimeData>
+#include <QVariantMap>
 #include "tray_icon.h"
-#include "novel_manager.h"
+#include "app_state.h"
+#include "settings_manager.h"
 
 class QListWidget;
 class QSplitter;
-class novel_manager;
 class QListWidgetItem;
 class QTimer;
 class QAction;
 class QElapsedTimer;
 class QToolBar;
 class novel_view;
-class QThread;
 class QLabel;
 
 class main_window : public QMainWindow
@@ -29,77 +29,85 @@ class main_window : public QMainWindow
     Q_OBJECT
 
    public:
-    explicit main_window(QWidget* parent = nullptr);
+    explicit main_window(app_state* app_state, settings_manager* settings_manager, QWidget* parent = nullptr);
     ~main_window() override;
+
+    void populate_recent_files_menu();
+    void set_status_message(const QString& chapter_text, const QString& progress_text);
+    void show_transient_status_message(const QString& message, int timeout);
+    void clear_novel_view();
+    void append_chapter_to_view(int chapter_index, const QString& content);
+    void prepend_chapter_to_view(int chapter_index, const QString& content);
+    void restore_scroll_position(double ratio);
+
+    int first_displayed_chapter_index() const;
+    int last_displayed_chapter_index() const;
+    bool is_chapter_displayed(int chapter_index) const;
+    QPair<int, double> get_current_progress() const;
 
    protected:
     void paintEvent(QPaintEvent* event) override;
     void dragEnterEvent(QDragEnterEvent* event) override;
     void dropEvent(QDropEvent* event) override;
-
-   protected:
     void closeEvent(QCloseEvent* event) override;
 
    signals:
-    void request_load_file(const QString& file_path, const QString& chapter_regex);
-    void request_chapter_content(int chapter_index);
+    void open_file_triggered();
+    void open_recent_file_triggered(const QVariantMap& file_info);
+    void clear_recent_files_triggered();
+    void chapter_selected(int index);
+    void regex_dialog_triggered();
+    void application_quit_triggered();
+    void save_progress_requested();
+
+    void request_load_previous_chapter();
+    void request_load_next_chapter();
+
+    void font_selected(const QFont& font);
+    void font_size_increase_triggered();
+    void font_size_decrease_triggered();
+    void line_spacing_increase_triggered();
+    void line_spacing_decrease_triggered();
+    void letter_spacing_increase_triggered();
+    void letter_spacing_decrease_triggered();
+    void auto_scroll_speed_increase_triggered();
+    void auto_scroll_speed_decrease_triggered();
 
    private slots:
-    void open_file_dialog();
-    void toggle_chapter_list_visibility();
     void on_chapter_list_item_clicked(QListWidgetItem* item);
-    void select_font_dialog();
-    void open_regex_dialog();
-
-    void populate_recent_files_menu();
-    void open_recent_file();
-    void clear_recent_files();
-    void on_chapter_found(const QString& title, qint64 offset);
-    void on_parsing_finished(size_t total_chapters);
-    void on_chapter_content_ready(int chapter_index, const QString& content);
-    void load_previous_chapter();
-    void load_next_chapter();
-
-    void update_progress_status();
+    void on_open_recent_file_action();
     void perform_auto_scroll();
-    void auto_scroll_click();
-    void increase_auto_speed();
-    void decrease_auto_speed();
-    void increase_font_size();
-    void decrease_font_size();
+    void on_auto_scroll_click();
     void update_background_gradient();
     void on_color_action();
     void change_to_next_color_scheme();
-    void increase_line_spacing();
     void switch_to_next_background();
-    void decrease_line_spacing();
-    void increase_letter_spacing();
-    void decrease_letter_spacing();
-    void load_next_chapter_action();
-    void load_previous_chapter_action();
+    void on_select_font_dialog();
 
-    void quit_application();
+    void on_app_state_chapter_list_cleared();
+    void on_app_state_chapter_found(const QString& title);
+    void on_app_state_current_chapter_index_changed(int index);
+    void on_settings_font_changed(const QFont& font);
+    void on_settings_spacing_changed(qreal line_spacing, qreal letter_spacing);
+
+    void on_view_scrolled();
+    void on_load_next_chapter_action();
+    void on_load_previous_chapter_action();
 
    private:
     void setup_ui();
     void setup_connections();
-    void load_chapter(int chapter_index);
     void setup_static_backgrounds();
     void setup_color_schemes();
-    void reset_auto_scroll_speed();
     void apply_font_and_spacing();
-    void ensure_chapter_is_visible(int chapter_index);
-    void update_recent_files(const QString& file_path);
-    void load_new_file(const QString& file_path);
-    void remove_recent_file(const QString& file_path);
-    void save_progress();
-    void load_progress(const QString& file_path);
-
-    QString get_current_regex();
     void setup_shortcuts();
+    void ensure_chapter_is_visible(int chapter_index);
+    void update_progress_status();
 
    private:
-    QString current_regex_;
+    app_state* app_state_;
+    settings_manager* settings_manager_;
+
     QList<QColor> static_backgrounds_;
     qsizetype current_static_bg_index_ = 0;
     QColor last_used_static_color_;
@@ -113,7 +121,8 @@ class main_window : public QMainWindow
     bool is_dynamic_background_ = false;
     QTimer* background_animation_timer_;
     QTimer* auto_scroll_timer_;
-    QTimer* auto_save_timer_ = nullptr;
+    QTimer* auto_save_timer_;
+
     QListWidget* chapter_list_;
     novel_view* novel_view_;
     QSplitter* splitter_;
@@ -136,26 +145,10 @@ class main_window : public QMainWindow
     QMenu* recent_files_menu_;
 
     bool auto_scroll_ = false;
-    int speed_ = 60;
-    QFont view_font_;
-    qreal line_spacing_ = 1.5;
-    qreal letter_spacing_ = 1.5;
-    novel_manager* novel_manager_;
-    QThread* worker_thread_;
-    size_t total_chapters_ = 0;
-    double scroll_ratio_to_restore_ = 0.0;
-    int chapter_index_to_restore_ = -1;
-    bool is_loading_content_ = false;
-    int initial_chapter_to_load_ = -1;
-    int current_chapter_index_ = -1;
-    QList<chapter_info> chapters_info_;
+
     tray_icon* tray_icon_ = nullptr;
     QLabel* status_chapter_label_ = nullptr;
     QLabel* status_progress_label_ = nullptr;
-
-    QString last_saved_file_path_;
-    int last_saved_chapter_index_ = -1;
-    double last_saved_scroll_ratio_ = -1.0;
 };
 
 #endif

@@ -1,3 +1,4 @@
+#include "novel_manager.h"
 #include <QFile>
 #include <QFileInfo>
 #include <boost/locale.hpp>
@@ -5,7 +6,6 @@
 #include <uchardet/uchardet.h>
 #include "log.h"
 #include "scoped_exit.h"
-#include "novel_manager.h"
 
 static std::string detect_file_encoding(const QString& file_path)
 {
@@ -50,7 +50,6 @@ novel_manager::~novel_manager() { LOG_INFO("novel_manager destroyed"); }
 
 void novel_manager::load_file(const QString& file_path, const QString& chapter_regex)
 {
-    setProperty("current_file_path", file_path);
     file_path_ = file_path;
     chapters_.clear();
     detected_encoding_ = detect_file_encoding(file_path);
@@ -93,7 +92,6 @@ void novel_manager::parse_chapters_async(const QString& chapter_regex)
     DEFER(file.unmap(mapped_data));
 
     LOG_INFO("parse chapters {} using regex {} with encoding {}", file_path_.toStdString(), chapter_regex.toStdString(), detected_encoding_);
-    // std::string utf8_str = "第[零一二三四五六七八九十百千万两0-9]+章[^\\r\\n]*";
     std::string utf8_str = chapter_regex.toStdString();
     std::string encoding_str;
     try
@@ -194,7 +192,7 @@ void novel_manager::fetch_chapter_content(int chapter_index)
     }
     qint64 length = end_pos - start_pos;
 
-    LOG_INFO("Fetching chapter index {} title {} start pos {} end pos {} size {}", chapter_index, current_chapter.title, start_pos, end_pos, length);
+    LOG_INFO("fetching chapter index {} title {} start pos {} end pos {} size {}", chapter_index, current_chapter.title, start_pos, end_pos, length);
 
     if (length <= 0)
     {

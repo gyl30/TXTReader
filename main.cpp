@@ -6,8 +6,8 @@
 #include <QString>
 #include <string>
 #include "log.h"
-#include "main_window.h"
 #include "scoped_exit.h"
+#include "app_controller.h"
 
 static QIcon emoji_to_icon(const QString &emoji, int size)
 {
@@ -31,7 +31,7 @@ int main(int argc, char *argv[])
     QApplication a(argc, argv);
     QApplication::setQuitOnLastWindowClosed(false);
     QApplication::setWindowIcon(emoji_to_icon("📖", 64));
-    main_window w;
-    w.show();
+    app_controller controller;
+    controller.run();
     return QApplication::exec();
 }
