@@ -18,6 +18,11 @@ class app_state : public QObject
     size_t total_chapters() const;
     int current_chapter_index() const;
 
+    const QString& search_keyword() const;
+    const QList<int>& search_results() const;
+    int current_search_result_index() const;
+    int total_search_results() const;
+
    public slots:
     void clear();
     void set_file_path(const QString& file_path);
@@ -25,18 +30,27 @@ class app_state : public QObject
     void set_parsing_finished(size_t total_chapters);
     void set_current_chapter_index(int index);
 
+    void set_search_results(const QString& keyword, const QList<int>& results);
+    void clear_search_results();
+    void set_current_search_result_index(int index);
+
    signals:
     void file_path_changed(const QString& file_path);
     void chapter_list_cleared();
     void chapter_found(const QString& title);
     void parsing_finished(size_t total_chapters);
     void current_chapter_index_changed(int index);
+    void search_results_changed();
 
    private:
     QString file_path_;
     QList<chapter_info> chapters_;
     size_t total_chapters_ = 0;
     int current_chapter_index_ = -1;
+
+    QString search_keyword_;
+    QList<int> search_results_;
+    int current_search_result_index_ = -1;
 };
 
 #endif    // TXTREADER_APP_STATE_H

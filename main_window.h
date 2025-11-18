@@ -23,6 +23,7 @@ class QElapsedTimer;
 class QToolBar;
 class novel_view;
 class QLabel;
+class QLineEdit;
 
 class main_window : public QMainWindow
 {
@@ -34,11 +35,15 @@ class main_window : public QMainWindow
 
     void populate_recent_files_menu();
     void set_status_message(const QString& chapter_text, const QString& progress_text);
-    void show_transient_status_message(const QString& message, int timeout);
+    void show_transient_status_message(const QString& message, int timeout = 0);
     void clear_novel_view();
     void append_chapter_to_view(int chapter_index, const QString& content);
     void prepend_chapter_to_view(int chapter_index, const QString& content);
     void restore_scroll_position(double ratio);
+
+    void perform_local_search(const QString& keyword);
+    void jump_to_match(int match_index);
+    void clear_local_search();
 
     int first_displayed_chapter_index() const;
     int last_displayed_chapter_index() const;
@@ -73,6 +78,10 @@ class main_window : public QMainWindow
     void auto_scroll_speed_increase_triggered();
     void auto_scroll_speed_decrease_triggered();
 
+    void search_triggered(const QString& keyword);
+    void find_next_result_triggered();
+    void find_previous_result_triggered();
+
    private slots:
     void on_chapter_list_item_clicked(QListWidgetItem* item);
     void on_open_recent_file_action();
@@ -84,11 +93,14 @@ class main_window : public QMainWindow
     void switch_to_next_background();
     void on_select_font_dialog();
 
+    void on_search_return_pressed();
+
     void on_app_state_chapter_list_cleared();
     void on_app_state_chapter_found(const QString& title);
     void on_app_state_current_chapter_index_changed(int index);
     void on_settings_font_changed(const QFont& font);
     void on_settings_spacing_changed(qreal line_spacing, qreal letter_spacing);
+    void on_app_state_search_results_changed();
 
     void on_view_scrolled();
     void on_load_next_chapter_action();
@@ -103,6 +115,7 @@ class main_window : public QMainWindow
     void setup_shortcuts();
     void ensure_chapter_is_visible(int chapter_index);
     void update_progress_status();
+    void update_search_status();
 
    private:
     app_state* app_state_;
@@ -144,11 +157,16 @@ class main_window : public QMainWindow
     QAction* recent_files_action_;
     QMenu* recent_files_menu_;
 
+    QLineEdit* search_input_;
+    QAction* find_next_action_;
+    QAction* find_prev_action_;
+
     bool auto_scroll_ = false;
 
     tray_icon* tray_icon_ = nullptr;
     QLabel* status_chapter_label_ = nullptr;
     QLabel* status_progress_label_ = nullptr;
+    QLabel* status_search_label_ = nullptr;
 };
 
 #endif

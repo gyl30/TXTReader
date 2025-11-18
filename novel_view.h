@@ -31,6 +31,7 @@ struct text_position
     int chapter_layout_index = -1;
     int paragraph_index = -1;
     int char_index = -1;
+    int length = 0;
 };
 
 class novel_view : public QAbstractScrollArea
@@ -56,6 +57,9 @@ class novel_view : public QAbstractScrollArea
 
    public slots:
     void copy_selection();
+    void search(const QString& keyword);
+    void jump_to_match(int match_index);
+    void clear_search();
 
    protected:
     void paintEvent(QPaintEvent* event) override;
@@ -88,6 +92,10 @@ class novel_view : public QAbstractScrollArea
     bool is_selecting_ = false;
     text_position selection_start_;
     text_position selection_end_;
+
+    QString search_keyword_;
+    QList<text_position> search_results_;
+    int current_search_index_ = -1;
 };
 
 #endif    // TXTREADER_NOVEL_VIEW_H

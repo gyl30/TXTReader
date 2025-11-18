@@ -52,6 +52,7 @@ void novel_view::clear_content()
     chapter_layouts_.clear();
     total_height_ = 0;
     clear_selection();
+    clear_search();
     update_scrollbar();
     viewport()->update();
 }
@@ -193,36 +194,48 @@ void novel_view::paintEvent(QPaintEvent* event)
             }
 
             QPointF draw_position(0, para_top_y);
+            QVector<QTextLayout::FormatRange> formatting;
 
-            bool para_has_selection = false;
             if (has_selection)
             {
                 text_position para_start_pos = {chap_idx, para_idx, 0};
                 text_position para_end_pos = {chap_idx, para_idx, static_cast<int>(para.text_layout->text().length())};
                 if (!(selection_end_pos < para_start_pos || selection_start_pos > para_end_pos))
                 {
-                    para_has_selection = true;
+                    int start = (selection_start_pos > para_start_pos) ? selection_start_pos.char_index : 0;
+                    int end = (selection_end_pos < para_end_pos) ? selection_end_pos.char_index : para_end_pos.char_index;
+                    if (start < end)
+                    {
+                        QTextLayout::FormatRange selection_range;
+                        selection_range.start = start;
+                        selection_range.length = end - start;
+                        selection_range.format.setBackground(palette().highlight());
+                        selection_range.format.setForeground(palette().highlightedText());
+                        formatting.append(selection_range);
+                    }
                 }
             }
 
-            if (para_has_selection)
+            if (!search_keyword_.isEmpty())
             {
-                QVector<QTextLayout::FormatRange> selections;
-                int start = (selection_start_pos > text_position{chap_idx, para_idx, 0}) ? selection_start_pos.char_index : 0;
-                int end = (selection_end_pos < text_position{chap_idx, para_idx, static_cast<int>(para.text_layout->text().length())})
-                              ? selection_end_pos.char_index
-                              : static_cast<int>(para.text_layout->text().length());
-
-                if (start < end)
+                for (int i = 0; i < search_results_.size(); ++i)
                 {
-                    QTextLayout::FormatRange selection_range;
-                    selection_range.start = start;
-                    selection_range.length = end - start;
-                    selection_range.format.setBackground(palette().highlight());
-                    selection_range.format.setForeground(palette().highlightedText());
-                    selections.append(selection_range);
+                    const auto& result = search_results_[i];
+                    if (result.chapter_layout_index == chap_idx && result.paragraph_index == para_idx)
+                    {
+                        QTextLayout::FormatRange search_range;
+                        search_range.start = result.char_index;
+                        search_range.length = result.length;
+                        QColor highlight_color = (i == current_search_index_) ? QColor(255, 165, 0, 180) : QColor(255, 255, 0, 150);
+                        search_range.format.setBackground(highlight_color);
+                        formatting.append(search_range);
+                    }
                 }
-                para.text_layout->draw(&painter, draw_position, selections);
+            }
+
+            if (!formatting.isEmpty())
+            {
+                para.text_layout->draw(&painter, draw_position, formatting);
             }
             else
             {
@@ -352,6 +365,69 @@ void novel_view::copy_selection()
     {
         QApplication::clipboard()->setText(selected);
     }
+}
+
+void novel_view::search(const QString& keyword)
+{
+    clear_search();
+    if (keyword.isEmpty())
+    {
+        return;
+    }
+
+    search_keyword_ = keyword;
+
+    for (int chap_idx = 0; chap_idx < chapter_layouts_.size(); ++chap_idx)
+    {
+        const auto& chapter = chapter_layouts_[chap_idx];
+        for (int para_idx = 0; para_idx < chapter.paragraphs.size(); ++para_idx)
+        {
+            const auto& para = chapter.paragraphs[para_idx];
+            const QString& text = para.text_layout->text();
+            int from = 0;
+            while ((from = text.indexOf(search_keyword_, from, Qt::CaseInsensitive)) != -1)
+            {
+                text_position result;
+                result.chapter_layout_index = chap_idx;
+                result.paragraph_index = para_idx;
+                result.char_index = from;
+                result.length = search_keyword_.length();
+                search_results_.append(result);
+                from += search_keyword_.length();
+            }
+        }
+    }
+    viewport()->update();
+}
+
+void novel_view::jump_to_match(int match_index)
+{
+    if (match_index < 0 || match_index >= search_results_.size())
+    {
+        return;
+    }
+    current_search_index_ = match_index;
+
+    const auto& result = search_results_[match_index];
+    const auto& chapter = chapter_layouts_[result.chapter_layout_index];
+    const auto& para = chapter.paragraphs[result.paragraph_index];
+    const auto& layout = para.text_layout;
+
+    QTextLine line = layout->lineForTextPosition(result.char_index);
+    if (line.isValid())
+    {
+        qreal y_pos = chapter.y + para.y + line.y() + line.height() / 2;
+        verticalScrollBar()->setValue(static_cast<int>(y_pos - viewport()->height() / 2.0));
+    }
+    viewport()->update();
+}
+
+void novel_view::clear_search()
+{
+    search_keyword_.clear();
+    search_results_.clear();
+    current_search_index_ = -1;
+    viewport()->update();
 }
 
 void novel_view::layout_chapter(chapter_layout& chapter, const QString& content)

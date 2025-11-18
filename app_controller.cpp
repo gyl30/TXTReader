@@ -1,4 +1,3 @@
-#include "app_controller.h"
 #include <QThread>
 #include <QFileDialog>
 #include <QMessageBox>
@@ -6,6 +5,7 @@
 #include <QTimer>
 #include <QApplication>
 #include "log.h"
+#include "app_controller.h"
 
 app_controller::app_controller(QObject* parent) : QObject(parent)
 {
@@ -55,9 +55,14 @@ void app_controller::setup_connections()
     connect(main_window_, &main_window::request_load_next_chapter, this, &app_controller::on_load_next_chapter);
     connect(main_window_, &main_window::request_load_previous_chapter, this, &app_controller::on_load_previous_chapter);
 
+    connect(main_window_, &main_window::search_triggered, this, &app_controller::on_search_triggered);
+    connect(main_window_, &main_window::find_next_result_triggered, this, &app_controller::on_find_next_result_triggered);
+    connect(main_window_, &main_window::find_previous_result_triggered, this, &app_controller::on_find_previous_result_triggered);
+
     connect(novel_manager_, &novel_manager::chapter_found, app_state_, &app_state::add_chapter);
     connect(novel_manager_, &novel_manager::parsing_finished, this, &app_controller::on_parsing_finished);
     connect(novel_manager_, &novel_manager::chapter_content_ready, this, &app_controller::on_chapter_content_ready);
+    connect(novel_manager_, &novel_manager::search_finished, this, &app_controller::on_search_finished);
 
     connect(worker_thread_, &QThread::finished, novel_manager_, &QObject::deleteLater);
 }
@@ -194,6 +199,14 @@ void app_controller::on_chapter_content_ready(int chapter_index, const QString& 
         chapter_index_to_restore_ = -1;
         scroll_ratio_to_restore_ = 0.0;
     }
+
+    if (highlight_on_load_)
+    {
+        main_window_->perform_local_search(app_state_->search_keyword());
+        main_window_->jump_to_match(target_match_index_in_chapter_);
+        highlight_on_load_ = false;
+        target_match_index_in_chapter_ = -1;
+    }
 }
 
 void app_controller::on_load_previous_chapter()
@@ -329,4 +342,94 @@ void app_controller::on_application_quit()
     on_save_progress_requested();
     main_window_->hide();
     QApplication::quit();
+}
+
+void app_controller::on_search_triggered(const QString& keyword)
+{
+    if (keyword.isEmpty())
+    {
+        app_state_->clear_search_results();
+        main_window_->clear_local_search();
+        return;
+    }
+
+    current_search_keyword_ = keyword;
+    main_window_->show_transient_status_message(QString("正在搜索 “%1”...").arg(keyword));
+    QMetaObject::invokeMethod(novel_manager_, "search_file", Qt::QueuedConnection, Q_ARG(QString, keyword));
+}
+
+void app_controller::on_search_finished(const QList<int>& result_chapter_indices)
+{
+    app_state_->set_search_results(current_search_keyword_, result_chapter_indices);
+    main_window_->show_transient_status_message(QString("找到 %1 个结果").arg(app_state_->total_search_results()), 3000);
+
+    if (app_state_->total_search_results() > 0)
+    {
+        on_find_next_result_triggered();
+    }
+}
+
+void app_controller::on_find_next_result_triggered()
+{
+    if (app_state_->total_search_results() == 0)
+    {
+        return;
+    }
+
+    int next_index = app_state_->current_search_result_index() + 1;
+    if (next_index >= app_state_->total_search_results())
+    {
+        next_index = 0;
+    }
+    navigate_to_search_result(next_index);
+}
+
+void app_controller::on_find_previous_result_triggered()
+{
+    if (app_state_->total_search_results() == 0)
+    {
+        return;
+    }
+
+    int prev_index = app_state_->current_search_result_index() - 1;
+    if (prev_index < 0)
+    {
+        prev_index = app_state_->total_search_results() - 1;
+    }
+    navigate_to_search_result(prev_index);
+}
+
+void app_controller::navigate_to_search_result(int result_index)
+{
+    app_state_->set_current_search_result_index(result_index);
+
+    const auto& results = app_state_->search_results();
+    if (result_index < 0 || result_index >= results.size())
+    {
+        return;
+    }
+
+    int target_chapter = results[result_index];
+
+    int matches_in_target_chapter_before_this = 0;
+    for (int i = 0; i < result_index; ++i)
+    {
+        if (results[i] == target_chapter)
+        {
+            matches_in_target_chapter_before_this++;
+        }
+    }
+
+    target_match_index_in_chapter_ = matches_in_target_chapter_before_this;
+
+    if (main_window_->is_chapter_displayed(target_chapter))
+    {
+        main_window_->perform_local_search(app_state_->search_keyword());
+        main_window_->jump_to_match(target_match_index_in_chapter_);
+    }
+    else
+    {
+        highlight_on_load_ = true;
+        load_chapter(target_chapter);
+    }
 }

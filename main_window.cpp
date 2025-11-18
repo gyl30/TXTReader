@@ -18,6 +18,7 @@
 #include <QKeySequence>
 #include <QShortcut>
 #include <QLabel>
+#include <QLineEdit>
 #include <QToolButton>
 #include "log.h"
 #include "splitter.h"
@@ -108,6 +109,14 @@ void main_window::setup_ui()
     color_action_ = main_tool_bar_->addAction("开启动态背景");
     switch_background_action_ = main_tool_bar_->addAction("切换背景");
 
+    main_tool_bar_->addSeparator();
+    search_input_ = new QLineEdit(this);
+    search_input_->setPlaceholderText("搜索...");
+    search_input_->setMaximumWidth(150);
+    main_tool_bar_->addWidget(search_input_);
+    find_prev_action_ = main_tool_bar_->addAction("上一个");
+    find_next_action_ = main_tool_bar_->addAction("下一个");
+
     auto_scroll_timer_ = new QTimer(this);
     auto_save_timer_ = new QTimer(this);
     background_animation_timer_ = new QTimer(this);
@@ -116,7 +125,9 @@ void main_window::setup_ui()
 
     status_chapter_label_ = new QLabel(" 就绪");
     status_progress_label_ = new QLabel("进度: --% ");
+    status_search_label_ = new QLabel();
     statusBar()->addWidget(status_chapter_label_, 1);
+    statusBar()->addPermanentWidget(status_search_label_);
     statusBar()->addPermanentWidget(status_progress_label_);
 
     statusBar()->setSizeGripEnabled(false);
@@ -153,9 +164,14 @@ void main_window::setup_connections()
     connect(color_change_timer_, &QTimer::timeout, this, &main_window::change_to_next_color_scheme);
     connect(switch_background_action_, &QAction::triggered, this, &main_window::switch_to_next_background);
 
+    connect(search_input_, &QLineEdit::returnPressed, this, &main_window::on_search_return_pressed);
+    connect(find_prev_action_, &QAction::triggered, this, [this](){ emit find_previous_result_triggered(); });
+    connect(find_next_action_, &QAction::triggered, this, [this](){ emit find_next_result_triggered(); });
+
     connect(app_state_, &app_state::chapter_list_cleared, this, &main_window::on_app_state_chapter_list_cleared);
     connect(app_state_, &app_state::chapter_found, this, &main_window::on_app_state_chapter_found);
     connect(app_state_, &app_state::current_chapter_index_changed, this, &main_window::on_app_state_current_chapter_index_changed);
+    connect(app_state_, &app_state::search_results_changed, this, &main_window::on_app_state_search_results_changed);
 
     connect(settings_manager_, &settings_manager::font_changed, this, &main_window::on_settings_font_changed);
     connect(settings_manager_, &settings_manager::spacing_changed, this, &main_window::on_settings_spacing_changed);
@@ -441,6 +457,10 @@ void main_window::restore_scroll_position(double ratio)
                        });
 }
 
+void main_window::perform_local_search(const QString& keyword) { novel_view_->search(keyword); }
+void main_window::jump_to_match(int match_index) { novel_view_->jump_to_match(match_index); }
+void main_window::clear_local_search() { novel_view_->clear_search(); }
+
 int main_window::first_displayed_chapter_index() const { return novel_view_->first_displayed_chapter_index(); }
 
 int main_window::last_displayed_chapter_index() const { return novel_view_->last_displayed_chapter_index(); }
@@ -453,8 +473,10 @@ void main_window::on_app_state_chapter_list_cleared()
 {
     chapter_list_->clear();
     novel_view_->clear_content();
+    search_input_->clear();
     status_chapter_label_->setText(" 正在解析章节...");
     status_progress_label_->setText("");
+    status_search_label_->setText("");
 }
 
 void main_window::on_app_state_chapter_found(const QString& title) { chapter_list_->addItem(title); }
@@ -526,6 +548,24 @@ void main_window::update_progress_status()
     }
 }
 
+void main_window::update_search_status()
+{
+    if (app_state_->total_search_results() > 0)
+    {
+        status_search_label_->setText(QString(" %1 / %2 ").arg(app_state_->current_search_result_index() + 1).arg(app_state_->total_search_results()));
+    }
+    else
+    {
+        status_search_label_->setText("");
+    }
+}
+
+void main_window::on_app_state_search_results_changed()
+{
+    update_search_status();
+}
+
+
 void main_window::ensure_chapter_is_visible(int chapter_index)
 {
     if (chapter_index < 0 || chapter_index >= chapter_list_->count())
@@ -555,4 +595,9 @@ void main_window::on_load_previous_chapter_action()
     {
         emit chapter_selected(current_index - 1);
     }
+}
+
+void main_window::on_search_return_pressed()
+{
+    emit search_triggered(search_input_->text());
 }

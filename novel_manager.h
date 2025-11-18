@@ -3,6 +3,7 @@
 
 #include <QObject>
 #include <QString>
+#include <QList>
 #include <vector>
 #include <string>
 
@@ -24,10 +25,12 @@ class novel_manager : public QObject
     void chapter_found(const QString& title, qint64 offset);
     void parsing_finished(size_t total_chapters);
     void chapter_content_ready(int chapter_index, const QString& content);
+    void search_finished(const QList<int>& result_chapter_indices);
 
    public slots:
     void load_file(const QString& file_path, const QString& chapter_regex);
     void fetch_chapter_content(int chapter_index);
+    void search_file(const QString& keyword);
 
    private:
     void parse_chapters_async(const QString& chapter_regex);

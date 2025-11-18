@@ -1,9 +1,11 @@
 #include "novel_manager.h"
 #include <QFile>
 #include <QFileInfo>
+#include <QSet>
 #include <boost/locale.hpp>
 #include <boost/regex.hpp>
 #include <uchardet/uchardet.h>
+#include <algorithm>
 #include "log.h"
 #include "scoped_exit.h"
 
@@ -216,4 +218,66 @@ void novel_manager::fetch_chapter_content(int chapter_index)
     }
 
     emit chapter_content_ready(chapter_index, content);
+}
+
+void novel_manager::search_file(const QString& keyword)
+{
+    if (keyword.isEmpty() || file_path_.isEmpty() || chapters_.empty())
+    {
+        emit search_finished({});
+        return;
+    }
+
+    QFile file(file_path_);
+    if (!file.open(QIODevice::ReadOnly))
+    {
+        emit search_finished({});
+        return;
+    }
+
+    uchar* mapped_data = file.map(0, file.size());
+    if (mapped_data == nullptr)
+    {
+        emit search_finished({});
+        return;
+    }
+    DEFER(file.unmap(mapped_data));
+
+    std::string encoded_keyword;
+    try
+    {
+        encoded_keyword = boost::locale::conv::from_utf(keyword.toStdString(), detected_encoding_);
+    }
+    catch (const boost::locale::conv::conversion_error& e)
+    {
+        LOG_ERROR("Search keyword encoding failed: {}", e.what());
+        emit search_finished({});
+        return;
+    }
+
+    QList<int> results;
+    std::string_view content(reinterpret_cast<const char*>(mapped_data), file.size());
+    size_t pos = 0;
+
+    while ((pos = content.find(encoded_keyword, pos)) != std::string_view::npos)
+    {
+        qint64 match_offset = static_cast<qint64>(pos);
+
+        auto it = std::upper_bound(
+            chapters_.begin(), chapters_.end(), match_offset, [](qint64 offset, const chapter_info& chap) { return offset < chap.offset; });
+
+        if (it != chapters_.begin())
+        {
+            --it;
+            auto chapter_index = std::distance(chapters_.begin(), it);
+            results.append(static_cast<int>(chapter_index));
+        }
+        else
+        {
+            results.append(0);
+        }
+        pos += encoded_keyword.length();
+    }
+
+    emit search_finished(results);
 }
