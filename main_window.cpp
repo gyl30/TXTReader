@@ -143,6 +143,8 @@ void main_window::setup_ui()
     statusBar()->addPermanentWidget(status_progress_label_);
 
     statusBar()->setSizeGripEnabled(false);
+    find_next_action_->setEnabled(false);
+    find_prev_action_->setEnabled(false);
 }
 
 void main_window::setup_connections()
@@ -151,6 +153,19 @@ void main_window::setup_connections()
     connect(toggle_list_action_, &QAction::triggered, this, [this]() { chapter_list_->setVisible(!chapter_list_->isVisible()); });
     connect(chapter_list_, &QListWidget::itemClicked, this, &main_window::on_chapter_list_item_clicked);
 
+    connect(search_input_, &QLineEdit::returnPressed, this, &main_window::on_search_return_pressed);
+    connect(search_input_,
+            &QLineEdit::textChanged,
+            this,
+            [this](const QString& text)
+            {
+                if (text.isEmpty())
+                {
+                    emit search_triggered("");
+                    find_next_action_->setEnabled(false);
+                    find_prev_action_->setEnabled(false);
+                }
+            });
     connect(novel_view_, &novel_view::need_previous_chapter, this, [this]() { emit request_load_previous_chapter(); });
     connect(novel_view_, &novel_view::need_next_chapter, this, [this]() { emit request_load_next_chapter(); });
     connect(novel_view_->verticalScrollBar(), &QScrollBar::valueChanged, this, &main_window::on_view_scrolled);
@@ -573,7 +588,20 @@ void main_window::update_search_status()
     }
 }
 
-void main_window::on_app_state_search_results_changed() { update_search_status(); }
+void main_window::on_app_state_search_results_changed()
+{
+    update_search_status();
+
+    bool has_results = app_state_->total_search_results() > 0;
+
+    find_next_action_->setEnabled(has_results);
+    find_prev_action_->setEnabled(has_results);
+
+    if (!has_results)
+    {
+        novel_view_->clear_search();
+    }
+}
 
 void main_window::ensure_chapter_is_visible(int chapter_index)
 {
