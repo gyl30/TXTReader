@@ -113,10 +113,18 @@ void main_window::setup_ui()
     color_action_ = main_tool_bar_->addAction("开启动态背景");
     switch_background_action_ = main_tool_bar_->addAction("切换背景");
 
-    main_tool_bar_->addSeparator();
+    QWidget* left_spacer = new QWidget(this);
+    left_spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    main_tool_bar_->addWidget(left_spacer);
     search_input_ = new QLineEdit(this);
     search_input_->setPlaceholderText("搜索...");
     search_input_->setMaximumWidth(150);
+    search_input_->setStyleSheet(R"(
+        QLineEdit { border: none; background-color: rgba(0, 0, 0, 0.05); color: #333333; }
+        QLineEdit:hover { background-color: rgba(0, 0, 0, 0.08); }
+        QLineEdit:focus { background-color: rgba(255, 255, 255, 0.9); color: #000000; }
+    )");
+
     main_tool_bar_->addWidget(search_input_);
     find_prev_action_ = main_tool_bar_->addAction("上一个");
     find_next_action_ = main_tool_bar_->addAction("下一个");
