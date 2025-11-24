@@ -1,4 +1,3 @@
-#include "main_window.h"
 #include <QApplication>
 #include <QFileDialog>
 #include <QHBoxLayout>
@@ -23,6 +22,7 @@
 #include "log.h"
 #include "splitter.h"
 #include "novel_view.h"
+#include "main_window.h"
 
 static const char* kChapterRegexShortcut = "Ctrl+R";
 
@@ -44,7 +44,11 @@ main_window::main_window(app_state* app_state, settings_manager* settings_manage
     setup_connections();
     setup_shortcuts();
     apply_font_and_spacing();
-    setStyleSheet("QSplitter, QListWidget, QToolBar, QStatusBar, QAbstractScrollArea { background-color: transparent; border: none; }");
+    setStyleSheet(R"(
+        QSplitter, QListWidget, QToolBar, QAbstractScrollArea { background-color: transparent; border: none; }
+        QStatusBar { background-color: transparent; padding: 0px; margin: 0px; }
+        QStatusBar::item { border: none; }
+    )");
     setWindowTitle("TXT 小说阅读器");
     auto_save_timer_->start(8000);
     resize(1024, 768);
@@ -66,11 +70,11 @@ void main_window::setup_ui()
     chapter_list_->setFixedWidth(250);
     chapter_list_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     chapter_list_->setStyleSheet(R"(
-    QScrollBar:vertical { background: transparent; width: 10px; margin: 0px; }
-    QScrollBar::handle:vertical { background: rgba(120,120,120,120); border-radius: 7px; min-height: 60px; }
-    QScrollBar::handle:vertical:hover { background: rgba(80,80,80,180); }
-    QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; }
-    QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: transparent; }
+        QScrollBar:vertical { background: transparent; width: 10px; margin: 0px; }
+        QScrollBar::handle:vertical { background: rgba(120,120,120,120); border-radius: 7px; min-height: 60px; }
+        QScrollBar::handle:vertical:hover { background: rgba(80,80,80,180); }
+        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; }
+        QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: transparent; }
     )");
     novel_view_ = new novel_view(splitter_);
     novel_view_->setFrameShape(QFrame::NoFrame);
@@ -165,8 +169,8 @@ void main_window::setup_connections()
     connect(switch_background_action_, &QAction::triggered, this, &main_window::switch_to_next_background);
 
     connect(search_input_, &QLineEdit::returnPressed, this, &main_window::on_search_return_pressed);
-    connect(find_prev_action_, &QAction::triggered, this, [this](){ emit find_previous_result_triggered(); });
-    connect(find_next_action_, &QAction::triggered, this, [this](){ emit find_next_result_triggered(); });
+    connect(find_prev_action_, &QAction::triggered, this, [this]() { emit find_previous_result_triggered(); });
+    connect(find_next_action_, &QAction::triggered, this, [this]() { emit find_next_result_triggered(); });
 
     connect(app_state_, &app_state::chapter_list_cleared, this, &main_window::on_app_state_chapter_list_cleared);
     connect(app_state_, &app_state::chapter_found, this, &main_window::on_app_state_chapter_found);
@@ -552,7 +556,8 @@ void main_window::update_search_status()
 {
     if (app_state_->total_search_results() > 0)
     {
-        status_search_label_->setText(QString(" %1 / %2 ").arg(app_state_->current_search_result_index() + 1).arg(app_state_->total_search_results()));
+        status_search_label_->setText(
+            QString(" %1 / %2 ").arg(app_state_->current_search_result_index() + 1).arg(app_state_->total_search_results()));
     }
     else
     {
@@ -560,11 +565,7 @@ void main_window::update_search_status()
     }
 }
 
-void main_window::on_app_state_search_results_changed()
-{
-    update_search_status();
-}
-
+void main_window::on_app_state_search_results_changed() { update_search_status(); }
 
 void main_window::ensure_chapter_is_visible(int chapter_index)
 {
@@ -597,7 +598,4 @@ void main_window::on_load_previous_chapter_action()
     }
 }
 
-void main_window::on_search_return_pressed()
-{
-    emit search_triggered(search_input_->text());
-}
+void main_window::on_search_return_pressed() { emit search_triggered(search_input_->text()); }
