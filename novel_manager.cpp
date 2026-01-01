@@ -2,6 +2,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QSet>
+#include <QRegularExpression>
 #include <boost/locale.hpp>
 #include <boost/regex.hpp>
 #include <uchardet/uchardet.h>
@@ -9,6 +10,21 @@
 #include "log.h"
 #include "scoped_exit.h"
 
+static QString get_chapter_head(const QString& title)
+{
+    static const QRegularExpression re(R"(^第[0-9一二三四五六七八九十百千万两]+章)");
+
+    auto match = re.match(title);
+    if (match.hasMatch())
+    {
+        return match.captured(0);
+    }
+
+    QString clean_title = title;
+    static const QRegularExpression space_re("\\s");
+    clean_title.remove(space_re);
+    return clean_title;
+}
 static std::string detect_file_encoding(const QString& file_path)
 {
     uchardet_t ud = uchardet_new();
@@ -121,22 +137,48 @@ void novel_manager::parse_chapters_async(const QString& chapter_regex)
             return;
         }
 
-        std::string_view content(reinterpret_cast<const char*>(mapped_data), file_size);
-        boost::cregex_iterator begin(content.data(), content.data() + content.size(), chapter_pattern);
-        boost::cregex_iterator end;
+        const std::string_view content(reinterpret_cast<const char*>(mapped_data), file_size);
+        const boost::cregex_iterator begin(content.data(), content.data() + content.size(), chapter_pattern);
+        const boost::cregex_iterator end;
 
         uint32_t chapter_count = 0;
         uint32_t chapter_parse_failed = 0;
         uint32_t chapter_parse_success = 0;
+        uint32_t duplicate_chapter = 0;
         for (auto it = begin; it != end; ++it)
         {
             chapter_count++;
             const boost::cmatch& match = *it;
+            auto current_offset = static_cast<qint64>(match.position());
+            const std::string raw_title = match.str();
+
             try
             {
-                chapter_parse_success++;
                 chapter_info chapter = {match.str(), static_cast<qint64>(match.position())};
-                std::string utf8_title = boost::locale::conv::to_utf<char>(chapter.title, detected_encoding_, boost::locale::conv::method_type::skip);
+                const std::string utf8_title =
+                    boost::locale::conv::to_utf<char>(chapter.title, detected_encoding_, boost::locale::conv::method_type::skip);
+                if (!chapters_.empty())
+                {
+                    const auto& last_chapter = chapters_.back();
+                    qint64 distance = current_offset - last_chapter.offset;
+
+                    if (distance < 100)
+                    {
+                        const QString q_curr_title = QString::fromStdString(utf8_title);
+                        const QString q_last_title = QString::fromStdString(last_chapter.title);
+                        const QString head_curr = get_chapter_head(q_curr_title);
+                        const QString head_last = get_chapter_head(q_last_title);
+
+                        if (head_curr == head_last)
+                        {
+                            duplicate_chapter++;
+                            LOG_INFO("duplicate chapter head detected {} vs {} dist {}", head_curr.toStdString(), head_last.toStdString(), distance);
+                            continue;
+                        }
+                    }
+                }
+
+                chapter_parse_success++;
                 chapter.title = utf8_title;
                 chapters_.push_back(chapter);
                 emit chapter_found(QString::fromStdString(utf8_title), chapter.offset);
@@ -147,12 +189,13 @@ void novel_manager::parse_chapters_async(const QString& chapter_regex)
                 emit chapter_found("[标题转换失败]", 0);
             }
         }
-        LOG_INFO("parse chapters {} encoding {} chapters count {} failed {} success {}",
+        LOG_INFO("parse chapters {} encoding {} chapters count {} failed {} success {} duplicate {}",
                  file_path_.toStdString(),
                  detected_encoding_,
                  chapter_count,
                  chapter_parse_failed,
-                 chapter_parse_success);
+                 chapter_parse_success,
+                 duplicate_chapter);
     }
     if (chapters_.empty() && file_size > 0)
     {
