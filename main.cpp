@@ -5,6 +5,7 @@
 #include <QIcon>
 #include <QString>
 #include <string>
+#include <boost/locale.hpp>
 #include "log.h"
 #include "scoped_exit.h"
 #include "app_controller.h"
@@ -28,6 +29,8 @@ int main(int argc, char *argv[])
     std::string app_name(argv[0]);
     init_log(app_name + ".log");
     DEFER(shutdown_log());
+    boost::locale::generator gen;
+    std::locale::global(gen(""));
     QApplication a(argc, argv);
     QApplication::setQuitOnLastWindowClosed(false);
     QApplication::setWindowIcon(emoji_to_icon("📖", 64));
