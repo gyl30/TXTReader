@@ -385,7 +385,7 @@ void novel_view::search(const QString& keyword)
             const auto& para = chapter.paragraphs[para_idx];
             const QString& text = para.text_layout->text();
             int from = 0;
-            while ((from = text.indexOf(search_keyword_, from, Qt::CaseInsensitive)) != -1)
+            while ((from = text.indexOf(search_keyword_, from, Qt::CaseSensitive)) != -1)
             {
                 text_position result;
                 result.chapter_layout_index = chap_idx;
@@ -479,7 +479,7 @@ void novel_view::layout_chapter(chapter_layout& chapter, const QString& content)
 
     if (!paragraphs_text.isEmpty())
     {
-        chapter.height = chapter_current_height - paragraph_spacing_ + paragraph_spacing_;
+        chapter.height = chapter_current_height;
     }
     else
     {
