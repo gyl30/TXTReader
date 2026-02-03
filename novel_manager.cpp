@@ -54,8 +54,8 @@ static std::string detect_file_encoding(const QString& file_path)
     {
         return QString::fromLatin1(charset).trimmed().toStdString();
     }
-    LOG_ERROR("uchardet get charset failed {}", file_path.toStdString());
-    return "";
+    LOG_WARN("uchardet get charset failed {}, fallback to UTF-8", file_path.toStdString());
+    return "UTF-8";
 }
 
 novel_manager::novel_manager(QObject* parent) : QObject(parent)
@@ -81,6 +81,11 @@ void novel_manager::parse_chapters_async(const QString& chapter_regex)
         LOG_ERROR("parse chapters failed file path is empty");
         emit parsing_finished(0);
         return;
+    }
+    if (detected_encoding_.empty())
+    {
+        detected_encoding_ = "UTF-8";
+        LOG_WARN("detected encoding is empty, fallback to UTF-8 for {}", file_path_.toStdString());
     }
     LOG_INFO("parse chapters {} encoding {}", file_path_.toStdString(), detected_encoding_.c_str());
 
@@ -120,6 +125,7 @@ void novel_manager::parse_chapters_async(const QString& chapter_regex)
     {
         LOG_ERROR("regular expression encoding conversion failed {} encoding {} {}", utf8_str, detected_encoding_, e.what());
         emit parsing_finished(0);
+        return;
     }
     if (!encoding_str.empty())
     {
