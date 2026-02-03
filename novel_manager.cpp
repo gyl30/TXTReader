@@ -58,11 +58,7 @@ static std::string detect_file_encoding(const QString& file_path)
     return "UTF-8";
 }
 
-novel_manager::novel_manager(QObject* parent) : QObject(parent)
-{
-    boost::locale::generator gen;
-    std::locale::global(gen(""));
-}
+novel_manager::novel_manager(QObject* parent) : QObject(parent) {}
 
 novel_manager::~novel_manager() { LOG_INFO("novel_manager destroyed"); }
 
@@ -156,44 +152,49 @@ void novel_manager::parse_chapters_async(const QString& chapter_regex)
             chapter_count++;
             const boost::cmatch& match = *it;
             auto current_offset = static_cast<qint64>(match.position());
-            const std::string raw_title = match.str();
-
+            chapter_info chapter = {match.str(), current_offset};
+            std::string utf8_title;
+            bool title_converted = false;
             try
             {
-                chapter_info chapter = {match.str(), static_cast<qint64>(match.position())};
-                const std::string utf8_title =
-                    boost::locale::conv::to_utf<char>(chapter.title, detected_encoding_, boost::locale::conv::method_type::skip);
-                if (!chapters_.empty())
-                {
-                    const auto& last_chapter = chapters_.back();
-                    qint64 distance = current_offset - last_chapter.offset;
-
-                    if (distance < 100)
-                    {
-                        const QString q_curr_title = QString::fromStdString(utf8_title);
-                        const QString q_last_title = QString::fromStdString(last_chapter.title);
-                        const QString head_curr = get_chapter_head(q_curr_title);
-                        const QString head_last = get_chapter_head(q_last_title);
-
-                        if (head_curr == head_last)
-                        {
-                            duplicate_chapter++;
-                            LOG_INFO("duplicate chapter head detected {} vs {} dist {}", head_curr.toStdString(), head_last.toStdString(), distance);
-                            continue;
-                        }
-                    }
-                }
-
-                chapter_parse_success++;
-                chapter.title = utf8_title;
-                chapters_.push_back(chapter);
-                emit chapter_found(QString::fromStdString(utf8_title), chapter.offset);
+                utf8_title = boost::locale::conv::to_utf<char>(chapter.title, detected_encoding_, boost::locale::conv::method_type::skip);
+                title_converted = true;
             }
             catch (const boost::locale::conv::conversion_error&)
             {
                 chapter_parse_failed++;
-                emit chapter_found("[标题转换失败]", 0);
+                utf8_title = "[标题转换失败]";
             }
+
+            if (title_converted && !chapters_.empty())
+            {
+                const auto& last_chapter = chapters_.back();
+                qint64 distance = current_offset - last_chapter.offset;
+
+                if (distance < 100)
+                {
+                    const QString q_curr_title = QString::fromStdString(utf8_title);
+                    const QString q_last_title = QString::fromStdString(last_chapter.title);
+                    const QString head_curr = get_chapter_head(q_curr_title);
+                    const QString head_last = get_chapter_head(q_last_title);
+
+                    if (head_curr == head_last)
+                    {
+                        duplicate_chapter++;
+                        LOG_INFO("duplicate chapter head detected {} vs {} dist {}", head_curr.toStdString(), head_last.toStdString(), distance);
+                        continue;
+                    }
+                }
+            }
+
+            if (title_converted)
+            {
+                chapter_parse_success++;
+            }
+
+            chapter.title = utf8_title;
+            chapters_.push_back(chapter);
+            emit chapter_found(QString::fromStdString(utf8_title), chapter.offset);
         }
         LOG_INFO("parse chapters {} encoding {} chapters count {} failed {} success {} duplicate {}",
                  file_path_.toStdString(),
