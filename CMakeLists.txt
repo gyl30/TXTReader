@@ -30,6 +30,40 @@ get_filename_component(UCHARDET_INSTALL_PREFIX "${UCHARDET_INSTALL_PREFIX}" DIRE
 set(UCHARDET_INCLUDE_DIR "${UCHARDET_INSTALL_PREFIX}/include")
 message(STATUS "Uchardet include path: ${UCHARDET_INCLUDE_DIR}")
 
+add_library(encoding_detector STATIC
+    src/encoding/encoding_detector.cpp
+)
+
+target_include_directories(encoding_detector
+    PRIVATE
+    ${Boost_INCLUDE_DIRS}
+    third/spdlog/include
+    ${UCHARDET_INCLUDE_DIR}
+)
+
+target_link_libraries(encoding_detector
+    PRIVATE
+    Qt6::Core
+    uchardet::libuchardet
+)
+
+add_library(chapter_parser STATIC
+    src/parser/chapter_parser.cpp
+)
+
+target_include_directories(chapter_parser
+    PRIVATE
+    ${Boost_INCLUDE_DIRS}
+    third/spdlog/include
+    ${CMAKE_SOURCE_DIR}/src
+)
+
+target_link_libraries(chapter_parser
+    PRIVATE
+    Qt6::Core
+    ${Boost_LIBRARIES}
+)
+
 add_executable(TXTReader
     log.cpp
     main.cpp
@@ -49,6 +83,7 @@ target_include_directories(TXTReader
     ${Boost_INCLUDE_DIRS}
     third/spdlog/include
     ${UCHARDET_INCLUDE_DIR}
+    ${CMAKE_SOURCE_DIR}/src
 )
 
 target_link_libraries(TXTReader
@@ -57,6 +92,8 @@ target_link_libraries(TXTReader
     Qt6::Core
     ${Boost_LIBRARIES}
     uchardet::libuchardet
+    encoding_detector
+    chapter_parser
 )
 
 if(WIN32)

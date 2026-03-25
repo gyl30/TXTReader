@@ -7,6 +7,19 @@
 #include <vector>
 #include <string>
 
+namespace txtreader
+{
+namespace encoding
+{
+class EncodingDetector;
+}
+
+namespace parser
+{
+class ChapterParser;
+}
+}    // namespace txtreader
+
 struct chapter_info
 {
     std::string title;
@@ -39,6 +52,8 @@ class novel_manager : public QObject
     QString file_path_;
     std::vector<chapter_info> chapters_;
     std::string detected_encoding_;
+    txtreader::encoding::EncodingDetector* encoding_detector_ = nullptr;
+    txtreader::parser::ChapterParser* chapter_parser_ = nullptr;
 };
 
 #endif    // NOVEL_MANAGER_H
